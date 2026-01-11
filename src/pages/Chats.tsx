@@ -101,7 +101,8 @@ const Chats = () => {
       const { data: chatsData, error: cError } = await supabase
         .from('chats')
         .select('*')
-        .in('id', chatIds);
+        .in('id', chatIds)
+        .eq('is_announcement', false);
 
       if (cError) throw cError;
 

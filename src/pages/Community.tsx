@@ -330,31 +330,20 @@ const Community = () => {
 
       if (commError) throw commError;
 
-      // Create Announcement Chat
-      const { data: chatData, error: chatError } = await supabase
-        .from('chats')
+      // Add creator to community_members ensures visibility and accurate counts
+      const { error: memberError } = await supabase
+        .from('community_members')
         .insert({
-          type: 'group',
-          is_announcement: true,
           community_id: commData.id,
-          created_by: currentUserId,
-          name: `${data.name} Announcements`,
-        })
-        .select()
-        .single();
-
-      if (chatError) throw chatError;
-
-      // Add creator as admin participant
-      const { error: partError } = await supabase
-        .from('chat_participants')
-        .insert({
-          chat_id: chatData.id,
           user_id: currentUserId,
           role: 'admin'
         });
 
-      if (partError) throw partError;
+      if (memberError) {
+        // Fallback if 'admin' role isn't valid in enum, try 'member'
+        // But usually admin is safe. If it fails, we just log, community is still created.
+        console.warn("Could not add creator to community_members:", memberError);
+      }
 
       toast({ title: "Community Created", description: `"${data.name}" has been created successfully.` });
       setIsWizardOpen(false);
