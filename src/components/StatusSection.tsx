@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Plus, Heart, Send, X, Eye, ChevronUp, Type, Wand2, ArrowRight, Search, UserPlus, MessageCircle, User, Check, Share2, Trash2, Loader2, Sparkles, Globe, Users, Lock } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -448,6 +449,26 @@ const StatusSection = () => {
     // Styles Helper
     const filterClass = (filterName: string) => FILTERS.find(f => f.name === filterName)?.class || "";
 
+    // --- 7. Fullscreen Logic (Body Lock & ESC) ---
+    useEffect(() => {
+        if (viewingUserId) {
+            document.body.style.overflow = "hidden";
+        } else {
+            document.body.style.overflow = "";
+        }
+        return () => { document.body.style.overflow = ""; };
+    }, [viewingUserId]);
+
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && viewingUserId) {
+                setViewingUserId(null);
+                setShowStats(false);
+            }
+        };
+        window.addEventListener("keydown", handleEsc);
+        return () => window.removeEventListener("keydown", handleEsc);
+    }, [viewingUserId]);
 
     return (
         <div className="py-4 border-b border-white/5">
@@ -679,9 +700,9 @@ const StatusSection = () => {
             </Dialog>
 
 
-            {/* --- STORY VIEWER MODAL --- */}
-            <Dialog open={!!viewingUserId} onOpenChange={(o) => { if (!o) { setViewingUserId(null); setShowStats(false); } }}>
-                <DialogContent className="max-w-md h-[95vh] w-full p-0 border-0 bg-black flex flex-col relative overflow-hidden">
+            {/* --- STORY VIEWER OVERLAY (Portal) --- */}
+            {viewingUserId && createPortal(
+                <div className="fixed inset-0 z-[9999] w-screen h-[100dvh] bg-black flex flex-col relative overflow-hidden touch-none overscroll-none">
                     {activeStory && (
                         <>
                             {/* Background Blur */}
@@ -930,8 +951,9 @@ const StatusSection = () => {
                             </div>
                         </>
                     )}
-                </DialogContent>
-            </Dialog >
+                </div>,
+                document.body
+            )}
         </div >
     );
 };
