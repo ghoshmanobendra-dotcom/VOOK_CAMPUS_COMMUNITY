@@ -133,8 +133,8 @@ const StatusSection = () => {
                     visibility: (s.visibility as 'public' | 'campus' | 'followers') || 'campus',
                     campus_id: s.campus_id || 'Campus',
                     user: {
-                        id: s.profiles?.id || "unknown",
-                        username: s.profiles?.username || "Unknown",
+                        id: s.profiles?.id || s.user_id || "unknown",
+                        username: s.profiles?.username || "Unknown User",
                         name: s.profiles?.full_name || s.profiles?.username || "Unknown",
                         avatar: s.profiles?.avatar_url || "",
                         initials: (s.profiles?.full_name || "U")[0],
