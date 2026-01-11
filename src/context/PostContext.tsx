@@ -155,13 +155,21 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
             setIsLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
 
-            // Fetch posts with author info
+            // Fetch posts (HOME FEED ONLY: community_tag IS NULL OR standard privacy tags)
+            // Query logic: We want posts where community_tag DOES NOT look like a custom community name.
+            // Since we can't easily negate "any string", we rely on the logic that Personal Posts have:
+            // 1. community_tag is NULL
+            // 2. community_tag is "Campus Only"
+            // 3. community_tag is "Followers only"
+            // 4. community_tag is "Public" (if used anywhere)
+
             const { data: postsData, error } = await supabase
                 .from('posts')
                 .select(`
                     *,
                     profiles:user_id (id, full_name, username, avatar_url, college)
                 `)
+                .or('community_tag.is.null,community_tag.eq.Campus Only,community_tag.eq.Followers only')
                 .order('created_at', { ascending: false });
 
             console.log("postsData length:", postsData?.length, "error:", error);
@@ -406,9 +414,17 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
             console.log("Insert post error:", error);
             if (error) throw error;
 
-            // Refresh posts immediately
-            console.log("Post inserted, refreshing posts");
-            await fetchPosts();
+            // Refresh posts ONLY if it's a home/personal post
+            // If it's a community post, we don't need to refresh the global feed
+            const isHomePost = !newPostData.communityTag ||
+                newPostData.communityTag === "Campus Only" ||
+                newPostData.communityTag === "Followers only";
+
+            console.log("Post inserted. isHomePost:", isHomePost);
+
+            if (isHomePost) {
+                await fetchPosts();
+            }
             return true;
 
         } catch (error: any) {
