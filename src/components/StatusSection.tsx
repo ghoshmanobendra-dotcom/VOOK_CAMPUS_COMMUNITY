@@ -100,27 +100,30 @@ const StatusSection = () => {
 
     // --- 2. Fetch Stories & Interactions ---
     const fetchStories = async () => {
-        console.log("fetchStories called");
+        console.log("fetchStories init", { realUserId });
         try {
-            // Fetch stories + profiles + all likes (count/check)
-            // Removed story_views(count) to prevent potential RLS bottlenecks for now
+            setIsLoadingStories(true);
+
+            // 1. Core Fetch: Stories that haven't expired
             const { data, error } = await supabase
                 .from('stories')
                 .select(`
                     *,
-                    profiles:user_id ( id, username, full_name, avatar_url ),
+                    profiles:user_id ( id, username, full_name, avatar_url, restricted:users_restricted!user_id(status)  ),
                     story_likes ( user_id )
                 `)
-                .gt('expires_at', new Date().toISOString()) // Only active stories
-                .order('created_at', { ascending: true }); // Oldest first per user usually
+                .gt('expires_at', new Date().toISOString())
+                .order('created_at', { ascending: true });
 
-            console.log("stories data length:", data?.length, "error:", error);
             if (error) {
-                console.error("Supabase Error:", error);
+                console.error("Story Fetch Error:", error);
                 throw error;
             }
 
+            console.log("Raw Stories Fetched:", data?.length || 0);
+
             if (data) {
+                // 2. Map & Format
                 const stories: Story[] = data.map((s: any) => ({
                     id: s.id,
                     media: s.media_url,
@@ -134,18 +137,18 @@ const StatusSection = () => {
                     campus_id: s.campus_id || 'Campus',
                     user: {
                         id: s.profiles?.id || s.user_id || "unknown",
-                        username: s.profiles?.username || "Unknown User",
+                        username: s.profiles?.username || "Unknown",
                         name: s.profiles?.full_name || s.profiles?.username || "Unknown",
                         avatar: s.profiles?.avatar_url || "",
                         initials: (s.profiles?.full_name || "U")[0],
                     },
                     upvotes: s.story_likes?.length || 0,
                     hasUpvoted: realUserId ? s.story_likes?.some((l: any) => l.user_id === realUserId) : false,
-                    viewCount: 0, // Disabled view count on main feed for stability
+                    viewCount: 0,
                     isOwner: realUserId ? s.user_id === realUserId : false
                 }));
 
-                // Group by User ID
+                // 3. Group by User
                 const grouped = stories.reduce((acc, story) => {
                     const uid = story.user.id;
                     if (!acc[uid]) acc[uid] = [];
@@ -153,11 +156,12 @@ const StatusSection = () => {
                     return acc;
                 }, {} as Record<string, Story[]>);
 
+                console.log("Grouped Stories:", Object.keys(grouped).length, "users");
                 setGroupedStories(grouped);
             }
         } catch (err: any) {
-            console.error("Error fetching stories:", err);
-            toast.error("Could not load stories: " + err.message);
+            console.error("Critical Story Load Failure:", err);
+            toast.error("Unable to load stories.");
         } finally {
             setIsLoadingStories(false);
         }
@@ -536,7 +540,12 @@ const StatusSection = () => {
                                         setActiveStoryIndex(0);
                                     }}
                                 >
-                                    <div className="rounded-full p-[3px] bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500">
+                                    <div className={`rounded-full p-[3px] ${
+                                        // TODO: Add 'allViewed' logic using local tracking or fetched 'story_views' check
+                                        true
+                                            ? 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500'
+                                            : 'bg-zinc-700'
+                                        }`}>
                                         <Avatar className="h-16 w-16 border-4 border-black bg-zinc-900">
                                             <AvatarImage src={user.avatar} className="object-cover" />
                                             <AvatarFallback>{user.initials}</AvatarFallback>
