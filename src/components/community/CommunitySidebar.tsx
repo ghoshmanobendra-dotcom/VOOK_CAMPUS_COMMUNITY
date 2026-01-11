@@ -86,19 +86,12 @@ const CommunitySidebar = ({
                 <Button
                     variant="ghost"
                     className="w-full justify-start text-foreground gap-2 hover:bg-muted"
-                    onClick={onAddGroup}
-                >
-                    <Plus className="w-4 h-4" />
-                    Create new group
-                </Button>
-                <Button
-                    variant="ghost"
-                    className="w-full justify-start text-muted-foreground gap-2 hover:bg-muted hover:text-foreground"
                     onClick={onAddExistingGroup}
                 >
-                    <LinkIcon className="w-4 h-4" />
-                    Add existing group
+                    <Plus className="w-4 h-4" />
+                    Add existing groups
                 </Button>
+
             </div>
         </div>
     );
