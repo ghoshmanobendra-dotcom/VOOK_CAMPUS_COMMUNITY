@@ -558,13 +558,7 @@ const Chats = () => {
           ))}
         </div>
 
-        {/* Invite Button at Bottom */}
-        <div className="p-4 border-t border-border/50">
-          <Button variant="outline" className="w-full justify-center gap-2 bg-transparent border-dashed border-border text-muted-foreground hover:bg-primary/5 hover:text-primary hover:border-primary/50 transition-all h-9 text-sm">
-            <UserPlus className="h-4 w-4" />
-            Invite to Teams
-          </Button>
-        </div>
+
 
         {/* Mobile Bottom Nav Spacer if needed, or hide BottomNav on Desktop via CSS media queries in the component effectively */}
         <div className="md:hidden">
