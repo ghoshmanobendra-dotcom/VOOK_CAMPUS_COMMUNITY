@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, Phone, Video, MoreVertical, Send, Image, Smile, Mic, X,
-  Check, CheckCheck, AlertTriangle, Ban, Lightbulb, User, Volume2, Search, Plus, Paperclip
+  ArrowLeft, Phone, Video, MoreVertical, Send, Image as ImageIcon, Smile, Mic, X,
+  Check, CheckCheck, AlertTriangle, Ban, Lightbulb, User, Volume2, Search, Plus, Paperclip,
+  FileText, MessageSquare, Download
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,7 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
   const [showProfileQuickView, setShowProfileQuickView] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'chat' | 'files' | 'photos'>('chat');
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -468,6 +470,34 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
             </div>
           </div>
 
+          {/* Navigation Tabs */}
+          <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-lg mx-4 overflow-x-auto scrollbar-hide">
+            <Button
+              variant={activeTab === 'chat' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('chat')}
+              className={cn("text-xs font-medium transition-all", activeTab === 'chat' && "bg-background shadow-sm")}
+            >
+              Chat
+            </Button>
+            <Button
+              variant={activeTab === 'files' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('files')}
+              className={cn("text-xs font-medium transition-all", activeTab === 'files' && "bg-background shadow-sm")}
+            >
+              Files
+            </Button>
+            <Button
+              variant={activeTab === 'photos' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('photos')}
+              className={cn("text-xs font-medium transition-all", activeTab === 'photos' && "bg-background shadow-sm")}
+            >
+              Photos
+            </Button>
+          </div>
+
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full hidden sm:flex">
               <Phone className="h-5 w-5" />
@@ -501,70 +531,139 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
         </div>
       </motion.header>
 
-      {/* Messages Area */}
-      <ScrollArea className="flex-1 px-4 py-4 bg-muted/10">
-        <div className="space-y-6 pb-4">
-          {/* Announcement Banner */}
-          {isAnnouncement && (
-            <div className="flex flex-col items-center justify-center p-4 text-center my-4 opacity-80">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-2">
-                <Volume2 className="w-8 h-8 text-primary" />
+      {/* Tab Content */}
+      {activeTab === 'chat' && (
+        <ScrollArea className="flex-1 px-4 py-4 bg-muted/10">
+          <div className="space-y-6 pb-4">
+            {/* Announcement Banner */}
+            {isAnnouncement && (
+              <div className="flex flex-col items-center justify-center p-4 text-center my-4 opacity-80">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-2">
+                  <Volume2 className="w-8 h-8 text-primary" />
+                </div>
+                <p className="text-sm font-medium text-foreground">Community Announcements</p>
+                <p className="text-xs text-muted-foreground max-w-[200px]">Only community admins can send messages here.</p>
               </div>
-              <p className="text-sm font-medium text-foreground">Community Announcements</p>
-              <p className="text-xs text-muted-foreground max-w-[200px]">Only community admins can send messages here.</p>
-            </div>
-          )}
+            )}
 
-          {messages.map((message, index) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              isSelected={selectedMessageId === message.id}
-              onLongPress={() => setSelectedMessageId(message.id)}
-              onReaction={(emoji) => { }}
-              emojiReactions={[]}
-              index={index}
-            />
-          ))}
+            {messages.map((message, index) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isSelected={selectedMessageId === message.id}
+                onLongPress={() => setSelectedMessageId(message.id)}
+                onReaction={(emoji) => { }}
+                emojiReactions={[]}
+                index={index}
+              />
+            ))}
 
-          {/* Typing Indicator */}
-          <AnimatePresence>
-            {otherUserTyping && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                className="flex items-center gap-2"
-              >
-                <Avatar className="h-6 w-6">
-                  <AvatarImage src={chat.avatar} />
-                  <AvatarFallback className="bg-muted text-foreground font-semibold text-[10px]">
-                    {chat.initials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="bg-muted rounded-2xl rounded-bl-none px-3 py-2">
-                  <div className="flex gap-1">
-                    {[0, 1, 2].map((i) => (
-                      <motion.span
-                        key={i}
-                        className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full"
-                        animate={{ y: [0, -3, 0] }}
-                        transition={{
-                          duration: 0.6,
-                          repeat: Infinity,
-                          delay: i * 0.2,
-                        }}
-                      />
-                    ))}
+            {/* Typing Indicator */}
+            <AnimatePresence>
+              {otherUserTyping && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="flex items-center gap-2"
+                >
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={chat.avatar} />
+                    <AvatarFallback className="bg-muted text-foreground font-semibold text-[10px]">
+                      {chat.initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="bg-muted rounded-2xl rounded-bl-none px-3 py-2">
+                    <div className="flex gap-1">
+                      {[0, 1, 2].map((i) => (
+                        <motion.span
+                          key={i}
+                          className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full"
+                          animate={{ y: [0, -3, 0] }}
+                          transition={{
+                            duration: 0.6,
+                            repeat: Infinity,
+                            delay: i * 0.2,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div ref={scrollRef} />
+          </div>
+        </ScrollArea>
+      )}
+
+      {/* Files View */}
+      {activeTab === 'files' && (
+        <ScrollArea className="flex-1 bg-muted/10 p-4">
+          <div className="space-y-2 max-w-3xl mx-auto">
+            {messages.filter(m => m.type === 'file').length === 0 && (
+              <div className="flex flex-col items-center justify-center h-[50vh] text-muted-foreground">
+                <FileText className="h-12 w-12 mb-2 opacity-20" />
+                <p>No files shared yet</p>
+              </div>
+            )}
+            {messages.filter(m => m.type === 'file').map(m => (
+              <div key={m.id} className="flex items-center gap-3 p-3 bg-card rounded-lg border border-border hover:bg-muted/50 transition-colors group">
+                <div className="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+                  <FileText className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate text-foreground text-sm">{m.fileName || m.content.split('/').pop() || "Document"}</p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{m.senderName}</span>
+                    <span>•</span>
+                    <span>{m.timestamp}</span>
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <a
+                  href={m.content}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                  title="Download"
+                >
+                  <Download className="h-4 w-4" />
+                </a>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      )}
 
-          <div ref={scrollRef} />
-        </div>
-      </ScrollArea>
+      {/* Photos View */}
+      {activeTab === 'photos' && (
+        <ScrollArea className="flex-1 bg-muted/10 p-4">
+          {messages.filter(m => m.type === 'image').length === 0 && (
+            <div className="flex flex-col items-center justify-center h-[50vh] text-muted-foreground">
+              <ImageIcon className="h-12 w-12 mb-2 opacity-20" />
+              <p>No photos shared yet</p>
+            </div>
+          )}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-2">
+            {messages.filter(m => m.type === 'image').map(m => (
+              <div key={m.id} className="aspect-square relative group overflow-hidden rounded-xl border border-border bg-card cursor-pointer">
+                <img src={m.content} alt="Shared" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <Button variant="secondary" size="icon" className="scan-button rounded-full h-8 w-8" onClick={() => window.open(m.content, '_blank')}>
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                  <a href={m.content} download target="_blank" rel="noopener noreferrer">
+                    <Button variant="secondary" size="icon" className="rounded-full h-8 w-8">
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      )}
 
       {/* GIF Picker */}
       <AnimatePresence>
@@ -593,116 +692,118 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
         )}
       </AnimatePresence>
 
-      {/* Input Area */}
-      {isAnnouncement && !isAdmin ? (
-        <div className="bg-muted/50 p-4 text-center text-xs text-muted-foreground border-t border-border">
-          Only admins can send messages in this group.
-        </div>
-      ) : (
-        <TooltipProvider delayDuration={0}>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="sticky bottom-0 bg-background border-t border-border p-4"
-          >
-            <div className="flex items-end gap-2 max-w-4xl mx-auto">
-              <div className="flex gap-1 pb-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="rounded-full text-muted-foreground hover:bg-muted"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Plus className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Add files and images</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                className="hidden"
-                multiple={false}
-              />
-
-              <div className="flex-1 relative bg-muted/40 rounded-2xl border border-transparent focus-within:border-primary/30 focus-within:bg-muted/20 transition-all">
-                <Input
-                  placeholder="Type a message..."
-                  value={inputValue}
-                  onChange={(e) => {
-                    setInputValue(e.target.value);
-                    handleTyping();
-                  }}
-                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  className="pr-24 pl-4 py-6 bg-transparent border-none focus-visible:ring-0 shadow-none text-base"
-                />
-
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+      {/* Input Area (Only visible in Chat tab) */}
+      {activeTab === 'chat' && (
+        isAnnouncement && !isAdmin ? (
+          <div className="bg-muted/50 p-4 text-center text-xs text-muted-foreground border-t border-border">
+            Only admins can send messages in this group.
+          </div>
+        ) : (
+          <TooltipProvider delayDuration={0}>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="sticky bottom-0 bg-background border-t border-border p-4"
+            >
+              <div className="flex items-end gap-2 max-w-4xl mx-auto">
+                <div className="flex gap-1 pb-1">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setShowGifPicker(!showGifPicker)}
-                        className="text-muted-foreground hover:text-primary h-8 w-8 rounded-full"
+                        className="rounded-full text-muted-foreground hover:bg-muted"
+                        onClick={() => fileInputRef.current?.click()}
                       >
-                        <div className="border border-current rounded px-1 text-[9px] font-bold">GIF</div>
+                        <Plus className="h-5 w-5" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Choose GIF</p>
-                    </TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setShowEmojiPicker(!showEmojiPicker);
-                          setShowGifPicker(false);
-                        }}
-                        className={cn("h-8 w-8 rounded-full transition-colors", showEmojiPicker ? "text-primary" : "text-muted-foreground hover:text-primary")}
-                      >
-                        <Smile className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Choose Emoji</p>
+                      <p>Add files and images</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
-              </div>
 
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="pb-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon"
-                      onClick={handleSend}
-                      disabled={!inputValue.trim()}
-                      className="bg-primary text-primary-foreground hover:bg-primary/90 h-11 w-11 rounded-full shadow-md"
-                    >
-                      <Send className="h-5 w-5 ml-0.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Send message</p>
-                  </TooltipContent>
-                </Tooltip>
-              </motion.div>
-            </div>
-          </motion.div>
-        </TooltipProvider>
-      )}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  multiple={false}
+                />
+
+                <div className="flex-1 relative bg-muted/40 rounded-2xl border border-transparent focus-within:border-primary/30 focus-within:bg-muted/20 transition-all">
+                  <Input
+                    placeholder="Type a message..."
+                    value={inputValue}
+                    onChange={(e) => {
+                      setInputValue(e.target.value);
+                      handleTyping();
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                    className="pr-24 pl-4 py-6 bg-transparent border-none focus-visible:ring-0 shadow-none text-base"
+                  />
+
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setShowGifPicker(!showGifPicker)}
+                          className="text-muted-foreground hover:text-primary h-8 w-8 rounded-full"
+                        >
+                          <div className="border border-current rounded px-1 text-[9px] font-bold">GIF</div>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Choose GIF</p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setShowEmojiPicker(!showEmojiPicker);
+                            setShowGifPicker(false);
+                          }}
+                          className={cn("h-8 w-8 rounded-full transition-colors", showEmojiPicker ? "text-primary" : "text-muted-foreground hover:text-primary")}
+                        >
+                          <Smile className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Choose Emoji</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </div>
+
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="pb-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        onClick={handleSend}
+                        disabled={!inputValue.trim()}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90 h-11 w-11 rounded-full shadow-md"
+                      >
+                        <Send className="h-5 w-5 ml-0.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Send message</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </motion.div>
+              </div>
+            </motion.div>
+          </TooltipProvider>
+        ))
+      }
 
       {/* Profile Quick View Dialog */}
       <ProfileQuickView
