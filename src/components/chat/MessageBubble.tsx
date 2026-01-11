@@ -1,16 +1,17 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, CheckCheck } from "lucide-react";
+import { Check, CheckCheck, FileText, Music, Video, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Message {
   id: string;
   content: string;
-  type: "text" | "image" | "gif";
+  type: "text" | "image" | "gif" | "video" | "audio" | "file";
   sender: "me" | "them";
   timestamp: string;
   status: "sent" | "delivered" | "read";
   reactions?: string[];
-  senderName?: string; // Added for group chats
+  senderName?: string;
+  fileName?: string;
 }
 
 interface MessageBubbleProps {
@@ -45,29 +46,27 @@ const MessageBubble = ({
     }
   };
 
-  // Generate a consistent color based on the sender's name
   const getSenderColor = (name: string) => {
     const colors = [
-      "text-red-500",
-      "text-orange-500",
-      "text-amber-500",
-      "text-green-500",
-      "text-emerald-500",
-      "text-teal-500",
-      "text-cyan-500",
-      "text-blue-500",
-      "text-indigo-500",
-      "text-violet-500",
-      "text-purple-500",
-      "text-fuchsia-500",
-      "text-pink-500",
-      "text-rose-500",
+      "text-red-500", "text-orange-500", "text-amber-500", "text-green-500",
+      "text-emerald-500", "text-teal-500", "text-cyan-500", "text-blue-500",
+      "text-indigo-500", "text-violet-500", "text-purple-500", "text-fuchsia-500",
+      "text-pink-500", "text-rose-500",
     ];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
       hash = name.charCodeAt(i) + ((hash << 5) - hash);
     }
     return colors[Math.abs(hash) % colors.length];
+  };
+
+  const getFileName = (url: string) => {
+    try {
+      const parts = url.split('/');
+      return decodeURIComponent(parts[parts.length - 1].split('?')[0]);
+    } catch (e) {
+      return "Attachment";
+    }
   };
 
   return (
@@ -121,7 +120,7 @@ const MessageBubble = ({
           onClick={onLongPress}
           className={cn(
             "relative shadow-sm group",
-            message.type === "text" ? "px-4 py-2" : "p-1",
+            message.type === "text" ? "px-4 py-2" : "p-1.5",
             isMe
               ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-md"
               : "bg-card text-foreground border border-border/50 rounded-2xl rounded-tl-md"
@@ -136,6 +135,7 @@ const MessageBubble = ({
               </div>
             </div>
           )}
+
           {message.type === "image" && (
             <div className="relative">
               <img
@@ -149,6 +149,7 @@ const MessageBubble = ({
               </div>
             </div>
           )}
+
           {message.type === "gif" && (
             <div className="relative">
               <img
@@ -162,6 +163,51 @@ const MessageBubble = ({
               </div>
             </div>
           )}
+
+          {message.type === "video" && (
+            <div className="flex flex-col gap-1 min-w-[200px]">
+              <div className="relative rounded-lg overflow-hidden bg-black/10">
+                <video src={message.content} controls className="max-w-full max-h-60 rounded-lg" />
+              </div>
+              <div className={cn("flex items-center gap-1 justify-end px-1 opacity-70 text-[10px]", isMe ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                <span>{message.timestamp}</span>
+                {isMe && <span>{getStatusIcon()}</span>}
+              </div>
+            </div>
+          )}
+
+          {message.type === "audio" && (
+            <div className="flex flex-col gap-1 min-w-[250px] p-1">
+              <div className="flex items-center gap-2 p-2 bg-background/10 rounded-lg">
+                <Music className="h-6 w-6" />
+                <audio src={message.content} controls className="h-8 w-full max-w-[200px]" />
+              </div>
+              <div className={cn("flex items-center gap-1 justify-end px-1 opacity-70 text-[10px]", isMe ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                <span>{message.timestamp}</span>
+                {isMe && <span>{getStatusIcon()}</span>}
+              </div>
+            </div>
+          )}
+
+          {message.type === "file" && (
+            <div className="flex flex-col gap-1 min-w-[200px]">
+              <a href={message.content} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-background/10 rounded-xl hover:bg-background/20 transition-colors">
+                <div className="bg-primary/20 p-2 rounded-lg">
+                  <FileText className="h-6 w-6" />
+                </div>
+                <div className="flex flex-col overflow-hidden">
+                  <span className="text-sm font-medium truncate max-w-[150px]">{message.fileName || getFileName(message.content)}</span>
+                  <span className="text-[10px] opacity-70">Click to open</span>
+                </div>
+                <Download className="h-4 w-4 opacity-50 ml-auto" />
+              </a>
+              <div className={cn("flex items-center gap-1 justify-end px-1 opacity-70 text-[10px]", isMe ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                <span>{message.timestamp}</span>
+                {isMe && <span>{getStatusIcon()}</span>}
+              </div>
+            </div>
+          )}
+
         </motion.div>
 
         {/* Reactions */}

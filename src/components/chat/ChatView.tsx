@@ -10,6 +10,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MessageBubble from "./MessageBubble";
@@ -26,13 +32,14 @@ import { cn } from "@/lib/utils";
 export interface Message {
   id: string;
   content: string;
-  type: "text" | "image" | "gif";
+  type: "text" | "image" | "gif" | "video" | "audio" | "file";
   sender: "me" | "them";
   timestamp: string;
   status: "sent" | "delivered" | "read";
   reactions?: string[];
   senderId?: string;
   senderName?: string;
+  fileName?: string; // Optional for files
 }
 
 interface ChatViewProps {
@@ -146,17 +153,31 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
         return;
       }
 
-      const formatted: Message[] = data.map((m: any) => ({
-        id: m.id,
-        content: m.content,
-        type: m.content.startsWith('http') && (m.content.includes('/images/') || m.content.includes('giphy')) ? (m.content.includes('giphy') ? 'gif' : 'image') : 'text',
-        sender: m.sender_id === currentUser?.id ? 'me' : 'them',
-        senderId: m.sender_id,
-        senderName: m.sender_profile?.full_name || m.sender_profile?.username || "Unknown",
-        timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: m.read_at ? 'read' : 'delivered',
-        reactions: []
-      }));
+      const formatted: Message[] = data.map((m: any) => {
+        let type: Message['type'] = 'text';
+        const content = m.content || "";
+
+        if (content.startsWith('http')) {
+          if (content.includes('giphy')) type = 'gif';
+          else if (content.match(/\.(jpeg|jpg|gif|png|webp)$/i)) type = 'image';
+          else if (content.match(/\.(mp4|webm|ogg)$/i)) type = 'video';
+          else if (content.match(/\.(mp3|wav)$/i)) type = 'audio';
+          else if (content.includes('/images/')) type = 'image';
+          else type = 'file';
+        }
+
+        return {
+          id: m.id,
+          content: m.content,
+          type: type,
+          sender: m.sender_id === currentUser?.id ? 'me' : 'them',
+          senderId: m.sender_id,
+          senderName: m.sender_profile?.full_name || m.sender_profile?.username || "Unknown",
+          timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: m.read_at ? 'read' : 'delivered',
+          reactions: []
+        };
+      });
       setMessages(formatted);
 
       // Mark unread as read
@@ -189,13 +210,24 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
           .eq('id', newMsg.sender_id)
           .single();
 
+        const content = newMsg.content || "";
+        let type: Message['type'] = 'text';
+        if (content.startsWith('http')) {
+          if (content.includes('giphy')) type = 'gif';
+          else if (content.match(/\.(jpeg|jpg|gif|png|webp)$/i)) type = 'image';
+          else if (content.match(/\.(mp4|webm|ogg)$/i)) type = 'video';
+          else if (content.match(/\.(mp3|wav)$/i)) type = 'audio';
+          else if (content.includes('/images/')) type = 'image';
+          else type = 'file';
+        }
+
         setMessages(prev => {
           if (prev.some(m => m.id === newMsg.id)) return prev;
 
           const formattedMsg: Message = {
             id: newMsg.id,
             content: newMsg.content,
-            type: newMsg.content.includes('giphy') ? 'gif' : (newMsg.content.startsWith('http') && newMsg.content.includes('/images/') ? 'image' : 'text'),
+            type: type,
             sender: newMsg.sender_id === currentUser?.id ? 'me' : 'them',
             senderId: newMsg.sender_id,
             senderName: senderData?.full_name || senderData?.username || "Unknown",
@@ -293,29 +325,33 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && currentUser?.id) {
       if (isAnnouncement && !isAdmin) return;
-      // 1. Optimistic Placeholder (optional, but good UX if we could show a spinner. For now just toast)
-      // Or better: Show a "Uploading..." message?
-      // Let's stick to the pattern but since we don't have the URL yet, we can't show the image immediately
-      // unless we create a local object URL.
+
       const localUrl = URL.createObjectURL(file);
-      const tempId = "temp-img-" + Date.now();
+      const tempId = "temp-file-" + Date.now();
+
+      let type: Message['type'] = 'file';
+      if (file.type.startsWith('image/')) type = 'image';
+      else if (file.type.startsWith('video/')) type = 'video';
+      else if (file.type.startsWith('audio/')) type = 'audio';
 
       const optimisticMsg: Message = {
         id: tempId,
         content: localUrl,
-        type: "image",
+        type: type,
         sender: "me",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: "sent"
+        status: "sent",
+        fileName: file.name
       };
       setMessages(prev => [...prev, optimisticMsg]);
 
       try {
-        const fileName = `${currentUser.id}/${Date.now()}_${file.name}`;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${currentUser.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const { error: uploadError } = await supabase.storage.from('images').upload(fileName, file);
 
         if (uploadError) throw uploadError;
@@ -341,7 +377,7 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
 
       } catch (err: any) {
         console.error("Upload failed", err);
-        toast.error("Image upload failed: " + err.message);
+        toast.error("Upload failed: " + err.message);
         setMessages(prev => prev.filter(m => m.id !== tempId));
       }
     }
@@ -563,87 +599,109 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
           Only admins can send messages in this group.
         </div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="sticky bottom-0 bg-background border-t border-border p-4"
-        >
-          <div className="flex items-end gap-2 max-w-4xl mx-auto">
-            <div className="flex gap-1 pb-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full text-muted-foreground hover:bg-muted"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Plus className="h-5 w-5" />
-              </Button>
-            </div>
+        <TooltipProvider delayDuration={0}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="sticky bottom-0 bg-background border-t border-border p-4"
+          >
+            <div className="flex items-end gap-2 max-w-4xl mx-auto">
+              <div className="flex gap-1 pb-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full text-muted-foreground hover:bg-muted"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Plus className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Add files and images</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
 
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImageUpload}
-              accept="image/*"
-              className="hidden"
-            />
-
-            <div className="flex-1 relative bg-muted/40 rounded-2xl border border-transparent focus-within:border-primary/30 focus-within:bg-muted/20 transition-all">
-              <Input
-                placeholder="Type a message..."
-                value={inputValue}
-                onChange={(e) => {
-                  setInputValue(e.target.value);
-                  handleTyping();
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                className="pr-24 pl-4 py-6 bg-transparent border-none focus-visible:ring-0 shadow-none text-base"
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                className="hidden"
+                multiple={false}
               />
 
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowGifPicker(!showGifPicker)}
-                  className="text-muted-foreground hover:text-primary h-8 w-8 rounded-full"
-                  title="GIF"
-                >
-                  <div className="border border-current rounded px-1 text-[9px] font-bold">GIF</div>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-muted-foreground hover:text-primary h-8 w-8 rounded-full"
-                >
-                  <Image className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    setShowEmojiPicker(!showEmojiPicker);
-                    setShowGifPicker(false);
+              <div className="flex-1 relative bg-muted/40 rounded-2xl border border-transparent focus-within:border-primary/30 focus-within:bg-muted/20 transition-all">
+                <Input
+                  placeholder="Type a message..."
+                  value={inputValue}
+                  onChange={(e) => {
+                    setInputValue(e.target.value);
+                    handleTyping();
                   }}
-                  className={cn("h-8 w-8 rounded-full transition-colors", showEmojiPicker ? "text-primary" : "text-muted-foreground hover:text-primary")}
-                >
-                  <Smile className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                  className="pr-24 pl-4 py-6 bg-transparent border-none focus-visible:ring-0 shadow-none text-base"
+                />
 
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="pb-1">
-              <Button
-                size="icon"
-                onClick={handleSend}
-                disabled={!inputValue.trim()}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 h-11 w-11 rounded-full shadow-md"
-              >
-                <Send className="h-5 w-5 ml-0.5" />
-              </Button>
-            </motion.div>
-          </div>
-        </motion.div>
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowGifPicker(!showGifPicker)}
+                        className="text-muted-foreground hover:text-primary h-8 w-8 rounded-full"
+                      >
+                        <div className="border border-current rounded px-1 text-[9px] font-bold">GIF</div>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Choose GIF</p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setShowEmojiPicker(!showEmojiPicker);
+                          setShowGifPicker(false);
+                        }}
+                        className={cn("h-8 w-8 rounded-full transition-colors", showEmojiPicker ? "text-primary" : "text-muted-foreground hover:text-primary")}
+                      >
+                        <Smile className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Choose Emoji</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="pb-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      onClick={handleSend}
+                      disabled={!inputValue.trim()}
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 h-11 w-11 rounded-full shadow-md"
+                    >
+                      <Send className="h-5 w-5 ml-0.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Send message</p>
+                  </TooltipContent>
+                </Tooltip>
+              </motion.div>
+            </div>
+          </motion.div>
+        </TooltipProvider>
       )}
 
       {/* Profile Quick View Dialog */}
