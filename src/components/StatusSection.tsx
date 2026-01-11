@@ -240,6 +240,7 @@ const StatusSection = () => {
                 .getPublicUrl(uploadData?.path || fileName);
 
             // 3. Insert DB
+            const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
             const { error: insertError } = await supabase
                 .from('stories')
                 .insert({
@@ -254,9 +255,11 @@ const StatusSection = () => {
                     },
                     filter_name: selectedFilter.name,
                     campus_id: currentUser?.college || 'Campus',
-                    visibility: visibility,
-                    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
+                    visibility: visibility, // 'public', 'campus', 'followers'
+                    created_at: new Date().toISOString(),
+                    expires_at: expiresAt
                 });
+
             console.log("Insert error:", insertError);
             if (insertError) throw insertError;
 

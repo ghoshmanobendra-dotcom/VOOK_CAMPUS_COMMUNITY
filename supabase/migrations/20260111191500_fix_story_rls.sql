@@ -1,48 +1,63 @@
 -- Enable RLS
 ALTER TABLE stories ENABLE ROW LEVEL SECURITY;
 
--- 1. VIEW POLICY
+-- DROP existing policies to be clean
 DROP POLICY IF EXISTS "Stories View Policy" ON stories;
+DROP POLICY IF EXISTS "Stories Insert Policy" ON stories;
+DROP POLICY IF EXISTS "Stories Update Policy" ON stories;
+DROP POLICY IF EXISTS "Stories Delete Policy" ON stories;
+DROP POLICY IF EXISTS "allow_all_read" ON stories;
+DROP POLICY IF EXISTS "story_visibility" ON stories;
+
+
+-- 1. SELECT POLICY (Reading Stories)
+-- We enforce that stories must be active (not expired) AND visible to the viewer.
 CREATE POLICY "Stories View Policy" ON stories
 FOR SELECT
 USING (
-  -- User is the owner
-  auth.uid() = user_id 
-  -- OR Story is Public
-  OR visibility = 'public'
-  -- OR Story is Campus-limited and users share a campus
-  OR (visibility = 'campus' AND campus_id IN (
-    SELECT college FROM profiles WHERE id = auth.uid()
-  ))
-  -- OR Story is Followers-limited and user is a follower (assuming 'follows' table exists)
-  -- Note: If 'follows' table has different structure, this needs adjustment. 
-  -- safely skipping complex follower check if table structure is unknown, relying on Public/Campus for now usually covers 90% of use cases.
-  -- But adding a generic check if 'follows' exists:
-  OR (visibility = 'followers' AND EXISTS (
-    SELECT 1 FROM follows WHERE follower_id = auth.uid() AND following_id = stories.user_id
-  ))
+    -- 1. Not expired (unless it's your own, maybe you want to see archives? but standard is active only)
+    -- For simplicty and per prompt: expires_at > now()
+    expires_at > now()
+    AND (
+        -- 2a. Own Story
+        auth.uid() = user_id
+        
+        -- 2b. Public Story
+        OR visibility = 'public'
+        
+        -- 2c. Campus Story (Shared Campus)
+        OR (
+            visibility = 'campus' 
+            AND EXISTS (
+                SELECT 1 FROM profiles viewer 
+                WHERE viewer.id = auth.uid() 
+                AND viewer.college = (SELECT college FROM profiles owner WHERE owner.id = stories.user_id)
+            )
+        )
+        
+        -- 2d. Followers Story
+        OR (
+            visibility = 'followers'
+            AND EXISTS (
+                 -- Assuming 'follows' table: follower_id follows following_id
+                 SELECT 1 FROM follows 
+                 WHERE follower_id = auth.uid() 
+                 AND following_id = stories.user_id
+            )
+        )
+    )
 );
 
 -- 2. INSERT POLICY
-DROP POLICY IF EXISTS "Stories Insert Policy" ON stories;
 CREATE POLICY "Stories Insert Policy" ON stories
 FOR INSERT
 WITH CHECK (
-  auth.uid() = user_id
+    auth.uid() = user_id
 );
 
--- 3. UPDATE POLICY
-DROP POLICY IF EXISTS "Stories Update Policy" ON stories;
-CREATE POLICY "Stories Update Policy" ON stories
-FOR UPDATE
-USING (
-  auth.uid() = user_id
-);
-
--- 4. DELETE POLICY
-DROP POLICY IF EXISTS "Stories Delete Policy" ON stories;
+-- 3. DELETE POLICY
 CREATE POLICY "Stories Delete Policy" ON stories
 FOR DELETE
 USING (
-  auth.uid() = user_id
+    auth.uid() = user_id
 );
