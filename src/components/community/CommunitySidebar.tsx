@@ -1,4 +1,4 @@
-import { Plus, ChevronLeft, Hash, Link as LinkIcon, Users } from "lucide-react";
+import { ChevronLeft, Hash, Link as LinkIcon, Users, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -24,7 +24,7 @@ const CommunitySidebar = ({
     groups,
     onBack,
     onSelectGroup,
-    onAddGroup,
+
     onAddExistingGroup
 }: CommunitySidebarProps) => {
     return (
@@ -48,9 +48,20 @@ const CommunitySidebar = ({
             {/* Groups List */}
             <ScrollArea className="flex-1 px-3 py-4">
                 <div className="space-y-1">
-                    <h3 className="text-xs font-semibold text-muted-foreground mb-2 px-2 uppercase tracking-wide">
-                        Groups
-                    </h3>
+                    <div className="flex items-center justify-between px-2 mb-2">
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Groups
+                        </h3>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                            onClick={onAddExistingGroup}
+                            title="Add Group"
+                        >
+                            <Plus className="h-3 w-3" />
+                        </Button>
+                    </div>
 
                     {groups.length === 0 ? (
                         <div className="px-2 py-4 text-sm text-muted-foreground text-center italic">
@@ -83,12 +94,13 @@ const CommunitySidebar = ({
 
             {/* Footer Actions */}
             <div className="p-4 mt-auto border-t border-border/50 space-y-2">
+
                 <Button
                     variant="ghost"
-                    className="w-full justify-start text-foreground gap-2 hover:bg-muted"
+                    className="w-full justify-start text-muted-foreground gap-2 hover:bg-muted hover:text-foreground"
                     onClick={onAddExistingGroup}
                 >
-                    <Plus className="w-4 h-4" />
+                    <Users className="w-4 h-4" />
                     Add existing groups
                 </Button>
 

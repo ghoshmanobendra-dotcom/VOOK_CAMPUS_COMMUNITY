@@ -161,9 +161,43 @@ const Community = () => {
 
       if (error) throw error;
 
+      // --- MEMBER SYNC LOGIC ---
+      // 1. Fetch all participants from the added groups
+      const { data: participants, error: partError } = await supabase
+        .from('chat_participants')
+        .select('user_id')
+        .in('chat_id', selectedGroupsToAdd);
+
+      if (partError) {
+        console.error("Error fetching group participants for sync:", partError);
+        // Don't throw, as the group move succeeded. Just warn/toast.
+        toast({ variant: "destructive", title: "Warning", description: "Groups added, but member sync failed." });
+      } else if (participants && participants.length > 0) {
+        // 2. Prepare batch insert for community_members
+        // Use a Set to avoid duplicates within the batch
+        const uniqueUserIds = new Set(participants.map(p => p.user_id));
+        const newMembers = Array.from(uniqueUserIds).map(userId => ({
+          community_id: selectedCommunity.id,
+          user_id: userId,
+          role: 'member' // Default role
+        }));
+
+        // 3. Batch Insert (Upsert to ignore existing)
+        const { error: syncError } = await supabase
+          .from('community_members')
+          .upsert(newMembers, { onConflict: 'community_id,user_id', ignoreDuplicates: true });
+
+        if (syncError) {
+          console.error("Error syncing members:", syncError);
+          toast({ variant: "destructive", title: "Warning", description: "Groups added, but member sync had errors." });
+        } else {
+          console.log(`Synced ${newMembers.length} members to community.`);
+        }
+      }
+
       toast({
         title: "Groups Added",
-        description: `${selectedGroupsToAdd.length} group${selectedGroupsToAdd.length > 1 ? 's' : ''} added to community.`
+        description: `${selectedGroupsToAdd.length} group(s) added. Members synced.`
       });
 
       fetchCommunityGroups(selectedCommunity.id);
