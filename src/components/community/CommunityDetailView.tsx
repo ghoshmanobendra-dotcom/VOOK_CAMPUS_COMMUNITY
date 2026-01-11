@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import TiltCard from "@/components/TiltCard";
 
 import CommunityPostEditor from "./CommunityPostEditor";
+import CommunityFeed from "./CommunityFeed";
 
 interface CommunityDetailViewProps {
     community: any;
@@ -100,8 +101,7 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                     {activeTab === 'posts' && (
                         <div className="space-y-6">
 
-                            {/* Input Area */}
-                            {/* Input Area / Editor */}
+                            {/* Section 1: Create Post / Announcement */}
                             {isEditorOpen ? (
                                 <CommunityPostEditor
                                     communityId={community.id}
@@ -111,14 +111,14 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                                     defaultType={editorMode}
                                 />
                             ) : (
-                                <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+                                <div className="bg-card border border-border rounded-xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2">
                                     <div className="flex gap-4">
                                         <Avatar className="h-10 w-10">
                                             <AvatarFallback className="bg-primary/10 text-primary">ME</AvatarFallback>
                                         </Avatar>
                                         <div className="flex-1 space-y-3">
                                             <div
-                                                className="bg-muted/50 border border-transparent rounded-md px-4 py-2 text-muted-foreground text-sm cursor-text hover:bg-muted transition-colors"
+                                                className="bg-muted/50 border border-transparent rounded-lg px-4 py-2.5 text-muted-foreground text-sm cursor-text hover:bg-muted transition-colors"
                                                 onClick={() => {
                                                     setEditorMode("post");
                                                     setIsEditorOpen(true);
@@ -126,11 +126,10 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                                             >
                                                 Post in group...
                                             </div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-3">
                                                 <Button
-                                                    variant="secondary"
                                                     size="sm"
-                                                    className="h-8 gap-2"
+                                                    className="h-8 gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-lg font-medium shadow-sm transition-all"
                                                     onClick={() => {
                                                         setEditorMode("post");
                                                         setIsEditorOpen(true);
@@ -142,7 +141,7 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="h-8 gap-2 text-muted-foreground hover:text-foreground"
+                                                    className="h-8 gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 px-3 rounded-lg"
                                                     onClick={() => {
                                                         setEditorMode("announcement");
                                                         setIsEditorOpen(true);
@@ -157,14 +156,14 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                                 </div>
                             )}
 
-                            {/* Setup Cards (Empty State / Onboarding) */}
+                            {/* Setup Cards (Only for empty communities/admins - preserved as useful context) */}
                             {groups.length <= 1 && (
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-lg font-bold">Set up your community</h3>
                                         <p className="text-sm text-muted-foreground">Get started with these quick actions</p>
                                     </div>
-                                    <div className="grid md:grid-cols-3 gap-4">
+                                    <div className="grid md:grid-cols-2 gap-4">
                                         <div className="bg-card border border-border p-4 rounded-xl flex items-center gap-3 cursor-pointer hover:border-primary/50 transition-colors shadow-sm" onClick={onInvite}>
                                             <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
                                                 <UserPlus className="w-5 h-5" />
@@ -177,35 +176,14 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                                             </div>
                                             <span className="font-semibold text-sm">Create welcome message</span>
                                         </div>
-                                        {/* Removed Event Card logic as per "No Events button" constraint, but kept a slot if needed later or just hide it */}
                                     </div>
                                 </div>
                             )}
 
-                            {/* Groups List (Existing Logic) */}
-                            <div>
-                                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Groups</h3>
-                                <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                                    {groups.map(group => (
-                                        <TiltCard
-                                            key={group.id}
-                                            intensity={3}
-                                            className="p-4 bg-card border border-border rounded-xl cursor-pointer hover:border-primary/50 flex items-center gap-3 shadow-sm group"
-                                            onClick={() => onOpenGroup(group)}
-                                        >
-                                            <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 shrink-0">
-                                                {group.image_url ?
-                                                    <img src={group.image_url} className="w-full h-full object-cover rounded-lg" /> :
-                                                    <Users className="w-6 h-6" />
-                                                }
-                                            </div>
-                                            <div className="min-w-0">
-                                                <h4 className="font-semibold text-sm truncate">{group.name}</h4>
-                                                <p className="text-xs text-muted-foreground">Tap to chat</p>
-                                            </div>
-                                        </TiltCard>
-                                    ))}
-                                </div>
+                            {/* Section 2: Posts / Announcements (Feed View) */}
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider hidden">Feed</h3>
+                                <CommunityFeed communityName={community.name} />
                             </div>
                         </div>
                     )}
