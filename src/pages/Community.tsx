@@ -101,14 +101,27 @@ const Community = () => {
   const fetchCommunityGroups = async (communityId: string) => {
     const { data, error } = await supabase
       .from('chats')
-      .select('*')
+      .select(`
+        *,
+        participants:chat_participants (
+          user_id
+        )
+      `)
       .eq('community_id', communityId)
       .eq('type', 'group')
       .eq('is_announcement', false)
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setLinkedGroups(data);
+      const formattedGroups = data.map((group: any) => {
+        const participants = group.participants || [];
+        return {
+          ...group,
+          member_count: participants.length, // Useful for display
+          is_member: participants.some((p: any) => p.user_id === currentUserId)
+        };
+      });
+      setLinkedGroups(formattedGroups);
     }
   };
 
