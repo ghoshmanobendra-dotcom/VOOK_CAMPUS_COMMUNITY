@@ -75,6 +75,67 @@ const Community = () => {
     }
   }, [isAddGroupOpen, currentUserId]);
 
+  // Real-time subscription for group and member updates
+  useEffect(() => {
+    if (!selectedCommunity) return;
+
+    // Refresh initially to ensure we have latest counts
+    fetchCommunityMemberCount(selectedCommunity.id);
+
+    const channel = supabase
+      .channel(`community-${selectedCommunity.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_participants'
+        },
+        async (payload) => {
+          console.log("Realtime update (participants):", payload);
+
+          // Sync Logic: If a user is added to a group (INSERT), also add to community if needed
+          if (payload.eventType === 'INSERT' && payload.new.chat_id) {
+            const { data: chat } = await supabase
+              .from('chats')
+              .select('community_id')
+              .eq('id', payload.new.chat_id)
+              .single();
+
+            if (chat && chat.community_id === selectedCommunity.id) {
+              await supabase.from('community_members').upsert({
+                community_id: selectedCommunity.id,
+                user_id: payload.new.user_id,
+                role: 'member'
+              }, { onConflict: 'community_id,user_id', ignoreDuplicates: true });
+
+              // Refresh community count after sync
+              fetchCommunityMemberCount(selectedCommunity.id);
+            }
+          }
+
+          // Refresh groups to update counts and membership status
+          fetchCommunityGroups(selectedCommunity.id);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'community_members'
+        },
+        () => {
+          fetchCommunityMemberCount(selectedCommunity.id);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedCommunity]);
+
   const fetchCommunities = async () => {
     const { data, error } = await supabase
       .from('communities')
@@ -83,7 +144,8 @@ const Community = () => {
         chats (
           id,
           is_announcement
-        )
+        ),
+        members:community_members(count)
       `)
       .order('created_at', { ascending: false });
 
@@ -92,23 +154,53 @@ const Community = () => {
     } else {
       const formatted = data?.map((comm: any) => ({
         ...comm,
-        announcement_chat_id: comm.chats?.find((c: any) => c.is_announcement)?.id
+        announcement_chat_id: comm.chats?.find((c: any) => c.is_announcement)?.id,
+        member_count: comm.members?.[0]?.count || 0
       }));
       setCommunities(formatted || []);
+    }
+  };
+
+  const fetchCommunityMemberCount = async (communityId: string) => {
+    const { count, error } = await supabase
+      .from('community_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('community_id', communityId);
+
+    if (!error && count !== null) {
+      setCommunities(prev => prev.map(c =>
+        c.id === communityId ? { ...c, member_count: count } : c
+      ));
+      if (selectedCommunity?.id === communityId) { // Update selected instance too
+        setSelectedCommunity(prev => prev ? { ...prev, member_count: count } : null);
+      }
     }
   };
 
   const fetchCommunityGroups = async (communityId: string) => {
     const { data, error } = await supabase
       .from('chats')
-      .select('*')
+      .select(`
+        *,
+        participants:chat_participants (
+          user_id
+        )
+      `)
       .eq('community_id', communityId)
       .eq('type', 'group')
       .eq('is_announcement', false)
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setLinkedGroups(data);
+      const formattedGroups = data.map((group: any) => {
+        const participants = group.participants || [];
+        return {
+          ...group,
+          member_count: participants.length,
+          is_member: participants.some((p: any) => p.user_id === currentUserId)
+        };
+      });
+      setLinkedGroups(formattedGroups);
     }
   };
 
