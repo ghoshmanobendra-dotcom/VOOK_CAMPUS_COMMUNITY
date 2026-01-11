@@ -109,7 +109,7 @@ const StatusSection = () => {
                 .from('stories')
                 .select(`
                     *,
-                    profiles:user_id ( id, username, full_name, avatar_url, restricted:users_restricted!user_id(status)  ),
+                    profiles:user_id ( id, username, full_name, avatar_url ),
                     story_likes ( user_id )
                 `)
                 .gt('expires_at', new Date().toISOString())
