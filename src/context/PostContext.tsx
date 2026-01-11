@@ -50,6 +50,7 @@ export interface FeedPostData {
 interface PostContextType {
     // ... (rest of interface remains same)
     posts: FeedPostData[];
+    fetchPosts: (filter?: string) => Promise<void>;
     addPost: (post: Omit<FeedPostData, "id" | "timestamp" | "upvotes" | "comments">) => Promise<boolean>;
     toggleUpvote: (id: string) => Promise<void>;
     toggleBookmark: (id: string) => Promise<void>;
@@ -149,28 +150,39 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const fetchPosts = async () => {
-        console.log("fetchPosts called");
+    // Updated fetchPosts with Filter Support
+    const fetchPosts = async (filter: string = "all") => {
+        console.log("fetchPosts called with filter:", filter);
         try {
             setIsLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
 
-            // Fetch posts (HOME FEED ONLY: community_tag IS NULL OR standard privacy tags)
-            // Query logic: We want posts where community_tag DOES NOT look like a custom community name.
-            // Since we can't easily negate "any string", we rely on the logic that Personal Posts have:
-            // 1. community_tag is NULL
-            // 2. community_tag is "Campus Only"
-            // 3. community_tag is "Followers only"
-            // 4. community_tag is "Public" (if used anywhere)
-
-            const { data: postsData, error } = await supabase
+            let query = supabase
                 .from('posts')
                 .select(`
                     *,
                     profiles:user_id (id, full_name, username, avatar_url, college)
                 `)
-                .or('community_tag.is.null,community_tag.eq.Campus Only,community_tag.eq.Followers only')
                 .order('created_at', { ascending: false });
+
+            // Apply Filter Logic
+            if (filter === "campus") {
+                query = query.eq('visibility', 'campus');
+                // RLS enforces campus_id match, so we just ask for 'campus' type
+            } else if (filter === "followers") {
+                query = query.eq('visibility', 'followers');
+            } else if (filter === "all") {
+                // "Home" feed: Public posts OR "Campus Only" is hidden? 
+                // Prompts says: "Campus-Only posts ... Never appear in Home"
+                // So default/all = public only.
+                query = query.eq('visibility', 'public');
+            }
+            // "trending" usually implies public/all sorted, handled by sort or same as 'all' for now.
+            else if (filter === "trending") {
+                query = query.eq('visibility', 'public'); // Improve later with sort
+            }
+
+            const { data: postsData, error } = await query;
 
             console.log("postsData length:", postsData?.length, "error:", error);
             if (error) throw error;
@@ -184,7 +196,7 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                     .from('likes')
                     .select('post_id')
                     .eq('user_id', user.id)
-                    .eq('is_anonymous', isAnonymousMode); // Check ONE mode
+                    .eq('is_anonymous', isAnonymousMode);
 
                 if (likesResult) userLikes = likesResult.map(l => l.post_id);
 
@@ -192,13 +204,14 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                     .from('bookmarks')
                     .select('post_id')
                     .eq('user_id', user.id)
-                    .eq('is_anonymous', isAnonymousMode); // Check ONE mode
+                    .eq('is_anonymous', isAnonymousMode);
 
                 if (bookmarksResult) userBookmarks = bookmarksResult.map(b => b.post_id);
             }
 
             const formattedPosts: FeedPostData[] = (postsData || []).map(p => {
                 const isAnon = p.is_anonymous;
+                // ... mapping logic remains same ...
                 const isOwnPost = user && user.id === p.user_id;
 
                 return {
@@ -505,6 +518,7 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
         <PostContext.Provider
             value={{
                 posts,
+                fetchPosts,
                 addPost,
                 toggleUpvote,
                 toggleBookmark,

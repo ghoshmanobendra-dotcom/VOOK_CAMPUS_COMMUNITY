@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { usePosts } from "@/context/PostContext";
 
 interface UserProfile {
   id: string;
@@ -24,11 +25,19 @@ interface UserProfile {
 }
 
 const Index = () => {
+  const { fetchPosts } = usePosts();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [people, setPeople] = useState<UserProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterTab>("campus");
+
+  // Sync Filter with Backend
+  useEffect(() => {
+    fetchPosts(activeFilter);
+  }, [activeFilter]);
+
+  // ... (rest of search/people logic) ...
 
   useEffect(() => {
     const fetchPeople = async () => {
@@ -89,13 +98,13 @@ const Index = () => {
         toast.error("Please login to follow users");
         return;
       }
-  
+
       console.log(`Index handleFollowUser currentStatus: ${currentStatus} for userId: ${userId}`);
-  
+
       setPeople(prev => prev.map(p =>
         p.id === userId ? { ...p, isFollowing: !currentStatus } : p
       ));
-  
+
       if (currentStatus) {
         const { error } = await supabase.from('follows').delete().eq('follower_id', user.id).eq('following_id', userId);
         if (error) throw error;
