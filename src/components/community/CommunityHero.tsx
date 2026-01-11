@@ -8,7 +8,7 @@ interface CommunityHeroProps {
 }
 
 export const templates = [
-    { id: 'school', name: 'School', icon: GraduationCap, color: 'bg-orange-100 text-orange-600' },
+    { id: 'college', name: 'College', icon: GraduationCap, color: 'bg-orange-100 text-orange-600' },
     { id: 'business', name: 'Business', icon: Building2, color: 'bg-pink-100 text-pink-600' },
     { id: 'sports', name: 'Sports', icon: Trophy, color: 'bg-blue-100 text-blue-600' },
     { id: 'life', name: 'Life events', icon: Heart, color: 'bg-green-100 text-green-600' },

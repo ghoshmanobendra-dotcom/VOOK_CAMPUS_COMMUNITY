@@ -1,0 +1,206 @@
+import { useState } from "react";
+import { Users, FileText, Image as ImageIcon, Settings, UserPlus, Link, MoreHorizontal, Calendar, MessageSquare, Volume2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import TiltCard from "@/components/TiltCard";
+
+interface CommunityDetailViewProps {
+    community: any;
+    groups: any[];
+    onOpenGroup: (group: any) => void;
+    onOpenAnnouncement: () => void;
+    onInvite: () => void;
+}
+
+const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncement, onInvite }: CommunityDetailViewProps) => {
+    const [activeTab, setActiveTab] = useState("posts");
+
+    return (
+        <div className="flex-1 flex flex-col h-full bg-background/50 overflow-hidden relative">
+
+            {/* 1. Header Banner */}
+            <div className="h-48 relative shrink-0">
+                {/* Placeholder Gradient Banner - In real app, could be custom image */}
+                <div className="absolute inset-0 bg-gradient-to-r from-emerald-100 to-cyan-100 dark:from-emerald-950/30 dark:to-cyan-950/30">
+                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1600&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay" />
+                </div>
+
+                {/* Community Info Overlay */}
+                <div className="absolute bottom-4 left-6 flex items-end gap-4 z-10">
+                    <div className="w-16 h-16 rounded-xl bg-white dark:bg-slate-800 p-1 shadow-lg shadow-black/5">
+                        <Avatar className="w-full h-full rounded-lg">
+                            <AvatarImage src={community.image_url} />
+                            <AvatarFallback className="rounded-lg bg-indigo-600 text-white font-bold text-xl">
+                                {community.name[0]}
+                            </AvatarFallback>
+                        </Avatar>
+                    </div>
+                    <div className="mb-1">
+                        <h1 className="text-2xl font-bold text-foreground drop-shadow-sm">{community.name}</h1>
+                    </div>
+                </div>
+
+                {/* Header Actions */}
+                <div className="absolute bottom-4 right-6 flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="bg-background/80 backdrop-blur-sm border-transparent shadow-sm hidden md:flex" onClick={onInvite}>
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Invite
+                    </Button>
+                    <Button variant="ghost" size="icon" className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-lg">
+                        <Link className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-lg">
+                        <Settings className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+
+            {/* 2. Navigation Tabs */}
+            <div className="px-6 border-b border-border bg-background z-10">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <div className="flex items-center justify-between">
+                        <TabsList className="bg-transparent h-12 p-0 space-x-6 w-full justify-start rounded-none">
+                            <TabsTrigger
+                                value="posts"
+                                className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 font-medium"
+                            >
+                                Posts
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="files"
+                                className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 font-medium"
+                            >
+                                Files
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="photos"
+                                className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 font-medium"
+                            >
+                                Photos
+                            </TabsTrigger>
+                        </TabsList>
+
+                        {/* Events button REMOVED as per instructions */}
+                    </div>
+                </Tabs>
+            </div>
+
+            {/* 3. Tab Content */}
+            <ScrollArea className="flex-1 bg-muted/10">
+                <div className="p-6 max-w-5xl mx-auto space-y-8">
+
+                    {/* POSTS TAB */}
+                    {activeTab === 'posts' && (
+                        <div className="space-y-6">
+
+                            {/* Input Area */}
+                            <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+                                <div className="flex gap-4">
+                                    <Avatar className="h-10 w-10">
+                                        <AvatarFallback className="bg-primary/10 text-primary">ME</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 space-y-3">
+                                        <Input
+                                            placeholder="Post in group..."
+                                            className="bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/20"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                            <Button variant="secondary" size="sm" className="h-8 gap-2">
+                                                <MessageSquare className="w-4 h-4" />
+                                                Post
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 gap-2 text-muted-foreground hover:text-foreground"
+                                                onClick={onOpenAnnouncement}
+                                            >
+                                                <Volume2 className="w-4 h-4" />
+                                                Announcement
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Setup Cards (Empty State / Onboarding) */}
+                            {groups.length <= 1 && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-lg font-bold">Set up your community</h3>
+                                        <p className="text-sm text-muted-foreground">Get started with these quick actions</p>
+                                    </div>
+                                    <div className="grid md:grid-cols-3 gap-4">
+                                        <div className="bg-card border border-border p-4 rounded-xl flex items-center gap-3 cursor-pointer hover:border-primary/50 transition-colors shadow-sm" onClick={onInvite}>
+                                            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                                                <UserPlus className="w-5 h-5" />
+                                            </div>
+                                            <span className="font-semibold text-sm">Invite members</span>
+                                        </div>
+                                        <div className="bg-card border border-border p-4 rounded-xl flex items-center gap-3 cursor-pointer hover:border-primary/50 transition-colors shadow-sm" onClick={onOpenAnnouncement}>
+                                            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                                                <MessageSquare className="w-5 h-5" />
+                                            </div>
+                                            <span className="font-semibold text-sm">Create welcome message</span>
+                                        </div>
+                                        {/* Removed Event Card logic as per "No Events button" constraint, but kept a slot if needed later or just hide it */}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Groups List (Existing Logic) */}
+                            <div>
+                                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Groups</h3>
+                                <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                                    {groups.map(group => (
+                                        <TiltCard
+                                            key={group.id}
+                                            intensity={3}
+                                            className="p-4 bg-card border border-border rounded-xl cursor-pointer hover:border-primary/50 flex items-center gap-3 shadow-sm group"
+                                            onClick={() => onOpenGroup(group)}
+                                        >
+                                            <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 shrink-0">
+                                                {group.image_url ?
+                                                    <img src={group.image_url} className="w-full h-full object-cover rounded-lg" /> :
+                                                    <Users className="w-6 h-6" />
+                                                }
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h4 className="font-semibold text-sm truncate">{group.name}</h4>
+                                                <p className="text-xs text-muted-foreground">Tap to chat</p>
+                                            </div>
+                                        </TiltCard>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* FILES TAB */}
+                    {activeTab === 'files' && (
+                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                            <FileText className="w-16 h-16 mb-4 opacity-20" />
+                            <h3 className="text-lg font-medium text-foreground">No files yet</h3>
+                            <p className="text-sm">Files shared in groups will appear here.</p>
+                        </div>
+                    )}
+
+                    {/* PHOTOS TAB */}
+                    {activeTab === 'photos' && (
+                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                            <ImageIcon className="w-16 h-16 mb-4 opacity-20" />
+                            <h3 className="text-lg font-medium text-foreground">No photos yet</h3>
+                            <p className="text-sm">Photos shared in groups will appear here.</p>
+                        </div>
+                    )}
+
+                </div>
+            </ScrollArea>
+        </div>
+    );
+};
+
+export default CommunityDetailView;

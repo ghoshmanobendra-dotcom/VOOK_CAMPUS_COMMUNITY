@@ -19,6 +19,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
 import CommunityHero from "@/components/community/CommunityHero";
 import CreateCommunityWizard from "@/components/community/CreateCommunityWizard";
+import CommunitySidebar from "@/components/community/CommunitySidebar";
+import CommunityDetailView from "@/components/community/CommunityDetailView";
 
 // --- Types ---
 interface Community {
@@ -250,171 +252,113 @@ const Community = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 md:pb-0 h-screen flex flex-col overflow-hidden">
       <Header />
 
-      <main className="px-4 py-4 max-w-5xl mx-auto flex flex-col gap-4">
+      <main className="flex-1 flex overflow-hidden">
+
+        {/* VIEW 1: LANDING & LIST (When No Community Selected) + Dashboard Sidebar for styling? */}
+        {/* Actually, if selectedCommunity is null, we show the landing. If selected, we show the NEW layout. */}
 
         <AnimatePresence mode="wait">
           {!selectedCommunity ? (
-            // VIEW 1: LANDING & LIST
             <motion.div
               key="list"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-8"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full h-full overflow-y-auto px-4 py-4"
             >
-              <CommunityHero
-                onCreateClick={() => {
-                  setInitialTemplateId(null);
-                  setIsWizardOpen(true);
-                }}
-                onTemplateClick={(id) => {
-                  setInitialTemplateId(id);
-                  setIsWizardOpen(true);
-                }}
-              />
+              <div className="max-w-5xl mx-auto flex flex-col gap-4 pb-20">
+                <CommunityHero
+                  onCreateClick={() => {
+                    setInitialTemplateId(null);
+                    setIsWizardOpen(true);
+                  }}
+                  onTemplateClick={(id) => {
+                    setInitialTemplateId(id);
+                    setIsWizardOpen(true);
+                  }}
+                />
 
-              <div className="space-y-4 max-w-3xl mx-auto">
-                <div className="flex items-center justify-between px-2">
-                  <h2 className="text-xl font-bold font-['Outfit']">Your Communities</h2>
+                <div className="space-y-4 max-w-3xl mx-auto w-full">
+                  <div className="flex items-center justify-between px-2">
+                    <h2 className="text-xl font-bold font-['Outfit']">Your Communities</h2>
+                  </div>
+
+                  {communities.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground bg-muted/30 rounded-2xl border border-dashed border-border/50">
+                      <Users className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                      <p>You haven't joined any communities yet.</p>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {communities.map((comm) => (
+                        <TiltCard
+                          key={comm.id}
+                          intensity={5}
+                          onClick={() => setSelectedCommunity(comm)}
+                          className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border cursor-pointer hover:border-primary/50 transition-all group shadow-sm hover:shadow-md h-full"
+                        >
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/80 to-violet-600/80 flex items-center justify-center text-white font-bold text-lg shadow-inner shrink-0">
+                            {comm.image_url ? <img src={comm.image_url} className="w-full h-full object-cover rounded-xl" /> : comm.name[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-base truncate">{comm.name}</h3>
+                            <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                              <Users className="w-3 h-3" /> {Math.floor(Math.random() * 50) + 1} members
+                            </p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                        </TiltCard>
+                      ))}
+                    </div>
+                  )}
                 </div>
-
-                {communities.length === 0 ? (
-                  <div className="text-center py-10 text-muted-foreground bg-muted/30 rounded-2xl border border-dashed border-border/50">
-                    <Users className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                    <p>You haven't joined any communities yet.</p>
-                  </div>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {communities.map((comm) => (
-                      <TiltCard
-                        key={comm.id}
-                        intensity={5}
-                        onClick={() => setSelectedCommunity(comm)}
-                        className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border cursor-pointer hover:border-primary/50 transition-all group shadow-sm hover:shadow-md h-full"
-                      >
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/80 to-violet-600/80 flex items-center justify-center text-white font-bold text-lg shadow-inner shrink-0">
-                          {comm.image_url ? <img src={comm.image_url} className="w-full h-full object-cover rounded-xl" /> : comm.name[0]}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-base truncate">{comm.name}</h3>
-                          <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                            <Users className="w-3 h-3" /> {Math.floor(Math.random() * 50) + 1} members
-                          </p>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                      </TiltCard>
-                    ))}
-                  </div>
-                )}
               </div>
             </motion.div>
           ) : (
-            // VIEW 2: COMMUNITY DETAIL (Preserved Existing UI Logic with minor layout tweaks)
+            // VIEW 2: NEW TEAMS-STYLE LAYOUT
             <motion.div
-              key="detail"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-6 max-w-2xl mx-auto w-full"
+              key="detail-layout"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex w-full h-full"
             >
-              {/* Community Header */}
-              <div className="flex items-center gap-3 mb-6">
-                <Button variant="ghost" size="icon" onClick={() => setSelectedCommunity(null)} className="-ml-2">
-                  <ChevronLeft className="w-6 h-6" />
-                </Button>
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-primary to-violet-500 flex items-center justify-center text-white font-bold shadow-md text-xl">
-                  {selectedCommunity.name[0]}
+              {/* 1. Sidebar */}
+              <CommunitySidebar
+                communities={communities.map(c => ({ id: c.id, name: c.name, image_url: c.image_url }))}
+                selectedCommunityId={selectedCommunity.id}
+                onSelectCommunity={setSelectedCommunity}
+                onAddGroup={() => setIsAddGroupOpen(true)}
+              />
+
+              {/* Mobile Back Button (Top Left Overlay if on mobile) or handle in header? */}
+              {/* For now, relying on Sidebar being hidden on mobile and standard back navigation if needed, 
+                    but simpler to just have a 'Back' button in DetailView maybe? 
+                    Actually, let's inject a specialized back/home handler for mobile in Detail View context or header.
+                    However, the sidebar is hidden on md:flex. On mobile, we might need a way to go back to list.
+                */}
+
+              {/* 2. Main Content Area */}
+              <div className="flex-1 flex flex-col min-w-0 relative">
+                {/* Mobile Only Back Nav */}
+                <div className="md:hidden p-2 border-b flex items-center gap-2 bg-background">
+                  <Button variant="ghost" size="icon" onClick={() => setSelectedCommunity(null)}>
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
+                  <span className="font-semibold truncate">{selectedCommunity.name}</span>
                 </div>
-                <div>
-                  <h2 className="font-bold text-xl leading-tight">{selectedCommunity.name}</h2>
-                  <p className="text-sm text-muted-foreground">Community</p>
-                </div>
-                <div className="ml-auto">
-                  <Button variant="ghost" size="icon"><ShieldCheck className="w-5 h-5 text-primary" /></Button>
-                </div>
+
+                <CommunityDetailView
+                  community={selectedCommunity}
+                  groups={linkedGroups}
+                  onOpenGroup={openGroupChat}
+                  onOpenAnnouncement={() => openAnnouncementChat(selectedCommunity)}
+                  onInvite={() => toast({ title: "Invite Link Copied", description: "Share this link with others to join." })}
+                />
               </div>
-
-              {/* Announcements Section (Pinned) */}
-              <div
-                onClick={() => openAnnouncementChat(selectedCommunity)}
-                className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:bg-muted/30 transition-colors shadow-sm"
-              >
-                <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
-                  <Volume2 className="w-6 h-6" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">Announcements</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                    Only community admins can send messages
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  {/* Mock Timestamp */}
-                  <span className="text-[10px] text-muted-foreground">Pinned</span>
-                </div>
-              </div>
-
-              {/* Groups List */}
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">
-                  Groups
-                </h3>
-                <div className="bg-card border border-border rounded-xl divide-y divide-border overflow-hidden shadow-sm">
-
-                  {linkedGroups.map(group => (
-                    <div
-                      key={group.id}
-                      onClick={() => openGroupChat(group)}
-                      className="p-4 flex items-center gap-4 cursor-pointer hover:bg-muted/30 transition-colors"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden border border-border/50">
-                        {group.image_url ? (
-                          <img src={group.image_url} className="w-full h-full object-cover" />
-                        ) : (
-                          <Hash className="w-5 h-5 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-sm">{group.name}</h4>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Add Group Action */}
-                  <div
-                    onClick={() => setIsAddGroupOpen(true)}
-                    className="p-4 flex items-center gap-4 cursor-pointer hover:bg-muted/30 transition-colors text-primary"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Plus className="w-5 h-5" />
-                    </div>
-                    <h4 className="font-medium text-sm">Add group</h4>
-                  </div>
-                </div>
-              </div>
-
-              {/* Other Groups */}
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">
-                  Other Groups
-                </h3>
-                <div className="bg-card border border-border rounded-xl divide-y divide-border overflow-hidden shadow-sm">
-                  <div className="p-4 flex items-center gap-4 cursor-pointer hover:bg-muted/30 transition-colors opacity-70">
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                      <Users className="w-5 h-5 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-sm">Management (Admins)</h4>
-                      <p className="text-xs text-muted-foreground">Request to join</p>
-                    </div>
-                    <Button size="sm" variant="ghost" className="h-8 text-xs">Request</Button>
-                  </div>
-                </div>
-              </div>
-
             </motion.div>
           )}
         </AnimatePresence>
