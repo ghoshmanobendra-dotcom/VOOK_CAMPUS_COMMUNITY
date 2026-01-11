@@ -145,7 +145,7 @@ const Community = () => {
           id,
           is_announcement
         ),
-        members:community_members(count)
+        community_members (id)
       `)
       .order('created_at', { ascending: false });
 
@@ -155,7 +155,7 @@ const Community = () => {
       const formatted = data?.map((comm: any) => ({
         ...comm,
         announcement_chat_id: comm.chats?.find((c: any) => c.is_announcement)?.id,
-        member_count: comm.members?.[0]?.count || 0
+        member_count: comm.community_members?.length || 0
       }));
       setCommunities(formatted || []);
     }
