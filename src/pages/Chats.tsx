@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, MoreVertical, Edit2, X, UserPlus, Check, Loader2 } from "lucide-react";
+import { Search, MoreVertical, Edit2, X, UserPlus, Check, Loader2, BellOff, Trash2, Pin, Mail, Video, Phone, Plus, Image, Smile, Mic, Paperclip, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import BottomNav from "@/components/BottomNav";
 import ChatView from "@/components/chat/ChatView";
@@ -26,6 +27,7 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { Users } from "lucide-react";
 import CreateGroupDialog from "@/components/chat/CreateGroupDialog";
+import { cn } from "@/lib/utils";
 
 // Interface for the list view
 export interface ChatListItem {
@@ -40,6 +42,8 @@ export interface ChatListItem {
   unreadCount: number;
   isOnline?: boolean;
   isGroup?: boolean;
+  isPinned?: boolean; // Local state for demo
+  isMuted?: boolean;  // Local state for demo
 }
 
 // Interface for searching users
@@ -70,7 +74,7 @@ const Chats = () => {
   // Mark badge as cleared when visiting list
   useEffect(() => {
     markMessagesAsRead();
-  }, []);
+  }, [markMessagesAsRead]);
 
   // 1. Fetch Chats
   const fetchChats = async () => {
@@ -167,7 +171,9 @@ const Chats = () => {
           timestamp: lastMsg ? lastMsg.created_at : c.created_at,
           unreadCount: (lastMsg && lastMsg.sender_id !== currentUser.id && !lastMsg.read_at) ? 1 : 0,
           isOnline: false,
-          isGroup: isGroup
+          isGroup: isGroup,
+          isPinned: false, // Default
+          isMuted: false   // Default
         };
       }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) || [];
 
@@ -193,8 +199,6 @@ const Chats = () => {
 
     return () => { supabase.removeChannel(channel); };
   }, [currentUser?.id]);
-
-
 
   // Search Users for New Chat
   useEffect(() => {
@@ -224,16 +228,10 @@ const Chats = () => {
 
     try {
       // Check if chat exists
-      // Simple approach: Fetch all my chats, check if target is in them.
-      // Ideally we should have a more direct query or caching.
-      // Re-using fetch logic for simplicity or optimization:
-
-      // 1. Get my chat IDs
       const { data: myChats } = await supabase.from('chat_participants').select('chat_id').eq('user_id', currentUser.id);
       const myChatIds = myChats?.map(c => c.chat_id) || [];
 
       if (myChatIds.length > 0) {
-        // 2. Check if target is in any of these
         const { data: existing } = await supabase
           .from('chat_participants')
           .select('chat_id')
@@ -242,12 +240,10 @@ const Chats = () => {
           .single();
 
         if (existing) {
-          // Open existing
           const existingChat = chats.find(c => c.chatId === existing.chat_id);
           if (existingChat) {
             setActiveChat(existingChat);
           } else {
-            // It exists but wasn't loaded in list (maybe empty?), construct object
             setActiveChat({
               chatId: existing.chat_id,
               userId: targetUser.id,
@@ -266,11 +262,9 @@ const Chats = () => {
         }
       }
 
-      // Create New Chat
       const { data: newChat, error: cError } = await supabase.from('chats').insert({ type: 'private' }).select().single();
       if (cError) throw cError;
 
-      // Add participants
       const { error: pError } = await supabase.from('chat_participants').insert([
         { chat_id: newChat.id, user_id: currentUser.id },
         { chat_id: newChat.id, user_id: targetUser.id }
@@ -290,7 +284,7 @@ const Chats = () => {
       });
 
       setIsAddDialogOpen(false);
-      fetchChats(); // Refresh list
+      fetchChats();
 
     } catch (e: any) {
       console.error("Error creating chat:", e);
@@ -314,7 +308,6 @@ const Chats = () => {
         if (existing) {
           setActiveChat(existing);
         } else {
-          // Fetch minimal details for temp chat object
           const { data: chatData } = await supabase
             .from('chats')
             .select('*')
@@ -352,220 +345,264 @@ const Chats = () => {
   );
 
   const handleChatBack = () => {
-    // If we came from community, go back to community
     if (location.state?.isCommunity) {
       navigate('/community');
     } else {
       setActiveChat(null);
       fetchChats();
-      // Clear location state to prevent loop if user refreshes
       window.history.replaceState({}, document.title);
     }
   };
 
+  // Context Menu Handlers (UI Only for now as per prompt instructions regarding schema)
+  const handleMarkUnread = (chatId: string) => {
+    // In a real app, update DB. Here, we'd locally toggle.
+    setChats(prev => prev.map(c => c.chatId === chatId ? { ...c, unreadCount: c.unreadCount > 0 ? 0 : 1 } : c));
+    toast.success("Conversation marked");
+  };
+
+  const handlePinChat = (chatId: string) => {
+    setChats(prev => prev.map(c => c.chatId === chatId ? { ...c, isPinned: !c.isPinned } : c));
+    toast.success("Conversation pinned");
+  };
+
+  const handleMuteChat = (chatId: string) => {
+    setChats(prev => prev.map(c => c.chatId === chatId ? { ...c, isMuted: !c.isMuted } : c));
+    toast("Notifications muted");
+  };
+
+  const handleDeleteChatUI = (chatId: string) => {
+    // Soft confirm handled by logic or UI, here simple alert or toast
+    toast("Conversation deleted", {
+      description: "This will be removed from your list.",
+      action: {
+        label: "Undo",
+        onClick: () => console.log("Undo delete"),
+      },
+    });
+    setChats(prev => prev.filter(c => c.chatId !== chatId));
+  };
+
+
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border px-4 py-4"
-      >
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold font-['Outfit'] text-foreground">Chats</h1>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                <MoreVertical className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card border-border">
-              <DropdownMenuItem className="text-foreground focus:bg-muted">Mark all as read</DropdownMenuItem>
-              <DropdownMenuItem className="text-foreground focus:bg-muted">Archived chats</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </motion.header>
-
-      <div className="px-4 py-4 space-y-6">
-        {/* Search Bar */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="relative"
-        >
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search conversations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-card border-border focus:border-primary text-foreground"
-          />
-        </motion.div>
-
-        {/* Messages Section */}
-        <motion.section
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Messages
-            </h2>
-            {loading && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+      {/* Left Sidebar (Chats List) */}
+      <div className={cn(
+        "w-full md:w-[320px] lg:w-[380px] flex flex-col border-r border-border bg-card/50 backdrop-blur-sm z-30 transition-all duration-300",
+        activeChat ? "hidden md:flex" : "flex"
+      )}>
+        {/* Sidebar Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold font-['Outfit']">Chat</h1>
           </div>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/community')} title="Communities">
+              <Users className="h-5 w-5 text-muted-foreground" />
+            </Button>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Edit2 className="h-5 w-5 text-primary" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-border max-w-sm">
+                <DialogHeader>
+                  <DialogTitle>New Chat</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 mt-2">
+                  <Button
+                    className="w-full justify-start gap-2"
+                    variant="outline"
+                    onClick={() => {
+                      setIsAddDialogOpen(false);
+                      setIsCreateGroupOpen(true);
+                    }}
+                  >
+                    <Users className="h-4 w-4" />
+                    New Group
+                  </Button>
 
-          <div className="space-y-1">
-            <AnimatePresence>
-              {filteredChats.length === 0 && !loading && (
-                <div className="text-center py-10 text-muted-foreground text-sm">
-                  No conversations yet. Start one!
-                </div>
-              )}
-
-              {filteredChats.map((chat, index) => (
-                <motion.div
-                  key={chat.chatId}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ delay: index * 0.05 }}
-                  whileHover={{ backgroundColor: "hsl(var(--muted))" }}
-                  onClick={() => setActiveChat(chat)}
-                  className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors"
-                >
                   <div className="relative">
-                    <Avatar className="h-12 w-12 border border-white/10">
-                      <AvatarImage src={chat.avatar} className="object-cover" />
-                      <AvatarFallback className="bg-muted text-foreground font-semibold text-sm">
-                        {chat.initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    {chat.isOnline && (
-                      <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-primary border-2 border-background" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search people..."
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      className="pl-10 bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                    {foundUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        onClick={() => !isCreatingChat && handleStartNewChat(user)}
+                        className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-muted transition-colors"
+                      >
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={user.avatar_url} />
+                          <AvatarFallback>{user.full_name[0]}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{user.full_name}</span>
+                          <span className="text-xs text-muted-foreground">{user.username}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        {/* Sticky Search Bar */}
+        <div className="px-4 py-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Filter"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 h-9 bg-muted/50 border-none focus:ring-1 focus:ring-primary/20 rounded-md"
+            />
+          </div>
+        </div>
+
+        {/* Chat List */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar px-2 space-y-0.5">
+          {loading && (
+            <div className="flex justify-center p-4"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          )}
+          {!loading && filteredChats.length === 0 && (
+            <div className="text-center text-muted-foreground text-sm p-4">No conversations yet.</div>
+          )}
+          {filteredChats.map((chat) => (
+            <motion.div
+              key={chat.chatId}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className={cn(
+                "group flex items-center gap-3 p-3 rounded-md cursor-pointer transition-all relative",
+                activeChat?.chatId === chat.chatId ? "bg-muted/80 shadow-sm" : "hover:bg-muted/40"
+              )}
+              onClick={() => setActiveChat(chat)}
+            >
+              <div className="relative shrink-0">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={chat.avatar} className="object-cover" />
+                  <AvatarFallback className="bg-primary/20 text-primary font-medium text-xs">
+                    {chat.initials}
+                  </AvatarFallback>
+                </Avatar>
+                {chat.isOnline && (
+                  <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-card" />
+                )}
+              </div>
+
+              <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                <div className="flex justify-between items-center">
+                  <h3 className={cn("font-medium truncate text-sm", chat.unreadCount > 0 ? "text-foreground font-bold" : "text-foreground/90")}>
+                    {chat.name}
+                  </h3>
+                  <span className="text-[10px] text-muted-foreground shrink-0 opacity-70 group-hover:opacity-100">
+                    {chat.timestamp ? formatDistanceToNow(new Date(chat.timestamp), { addSuffix: false }).replace('about ', '').replace('less than a minute', 'Just now') : ''}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <p className={cn("text-xs truncate max-w-[180px]", chat.unreadCount > 0 ? "text-foreground font-medium" : "text-muted-foreground")}>
+                    {chat.lastMessage}
+                  </p>
+
+                  {/* Helper Icons */}
+                  <div className="flex items-center gap-1">
+                    {chat.isPinned && <Pin className="h-3 w-3 text-muted-foreground rotate-45" />}
+                    {chat.isMuted && <BellOff className="h-3 w-3 text-muted-foreground" />}
+                    {chat.unreadCount > 0 && (
+                      <div className="h-2 w-2 bg-primary rounded-full group-hover:scale-110 transition-transform" />
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-foreground truncate">
-                        {chat.name}
-                      </h3>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
-                        {chat.timestamp ? formatDistanceToNow(new Date(chat.timestamp), { addSuffix: true }) : ''}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <p className={`text-sm truncate ${chat.unreadCount > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                        {chat.lastMessage}
-                      </p>
-                      {chat.unreadCount > 0 && (
-                        <motion.span
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="ml-2 flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-primary text-primary-foreground rounded-full"
-                        >
-                          {chat.unreadCount}
-                        </motion.span>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        </motion.section>
+                </div>
+              </div>
+
+              {/* Dropdown Menu for Context Actions */}
+              <div onClick={(e) => e.stopPropagation()} className="absolute right-2 top-3 opacity-0 group-hover:opacity-100 transition-opacity bg-card/80 backdrop-blur rounded-full shadow-sm">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6">
+                      <MoreVertical className="h-3 w-3 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48 bg-card border-border z-50">
+                    <DropdownMenuItem onClick={() => handleMarkUnread(chat.chatId)}>
+                      <Mail className="h-4 w-4 mr-2" />
+                      {chat.unreadCount > 0 ? "Mark as read" : "Mark as unread"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handlePinChat(chat.chatId)}>
+                      <Pin className="h-4 w-4 mr-2" />
+                      {chat.isPinned ? "Unpin" : "Pin"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleMuteChat(chat.chatId)}>
+                      <BellOff className="h-4 w-4 mr-2" />
+                      {chat.isMuted ? "Unmute" : "Mute"}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-border" />
+                    <DropdownMenuItem onClick={() => handleDeleteChatUI(chat.chatId)} className="text-red-500 focus:text-red-500">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Invite Button at Bottom */}
+        <div className="p-4 border-t border-border/50">
+          <Button variant="outline" className="w-full justify-center gap-2 bg-transparent border-dashed border-border text-muted-foreground hover:bg-primary/5 hover:text-primary hover:border-primary/50 transition-all h-9 text-sm">
+            <UserPlus className="h-4 w-4" />
+            Invite to Teams
+          </Button>
+        </div>
+
+        {/* Mobile Bottom Nav Spacer if needed, or hide BottomNav on Desktop via CSS media queries in the component effectively */}
+        <div className="md:hidden">
+          <BottomNav />
+        </div>
       </div>
 
-      {/* New Chat FAB */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogTrigger asChild>
-          <motion.button
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-            className="fixed bottom-24 right-4 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center"
-          >
-            <Edit2 className="h-6 w-6" />
-          </motion.button>
-        </DialogTrigger>
-        <DialogContent className="bg-card border-border max-w-sm mx-4 top-[20%]">
-          <DialogHeader>
-            <DialogTitle className="text-foreground font-['Outfit'] text-xl">
-              New Conversation
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <Button
-              className="w-full justify-start gap-2"
-              variant="outline"
-              onClick={() => {
-                setIsAddDialogOpen(false);
-                setIsCreateGroupOpen(true);
-              }}
-            >
-              <Users className="h-4 w-4" />
-              New Group
-            </Button>
-
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search people..."
-                value={userSearchQuery}
-                onChange={(e) => setUserSearchQuery(e.target.value)}
-                className="pl-10 bg-muted border-border focus:border-primary text-foreground"
-              />
+      {/* Main Chat Area */}
+      <div className={cn(
+        "hidden md:flex flex-1 flex-col bg-background relative z-0 overflow-hidden",
+        activeChat ? "flex fixed inset-0 md:relative z-40 bg-background" : "hidden md:flex bg-background/50"
+      )}>
+        {activeChat ? (
+          <ChatView
+            chat={activeChat}
+            onBack={handleChatBack}
+            className="h-full w-full"
+          />
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground/50">
+            <div className="w-24 h-24 bg-muted/30 rounded-full flex items-center justify-center mb-6">
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full"></div>
+                <Smile className="relative h-10 w-10 text-muted-foreground/50" />
+              </div>
             </div>
-            <div className="space-y-2 max-h-[300px] overflow-y-auto scrollbar-hide">
-              {foundUsers.map((user) => (
-                <div
-                  key={user.id}
-                  onClick={() => !isCreatingChat && handleStartNewChat(user)}
-                  className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-muted transition-colors"
-                >
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={user.avatar_url} />
-                    <AvatarFallback>{user.full_name[0]}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <span className="font-medium text-foreground">{user.full_name}</span>
-                    <span className="text-xs text-muted-foreground">{user.username}</span>
-                  </div>
-                  {isCreatingChat && <Loader2 className="ml-auto h-4 w-4 animate-spin" />}
-                </div>
-              ))}
-              {userSearchQuery && foundUsers.length === 0 && (
-                <p className="text-center text-muted-foreground text-sm py-4">No users found.</p>
-              )}
-            </div>
+            <h2 className="text-xl font-semibold mb-2 text-foreground">Select a conversation</h2>
+            <p className="max-w-xs text-sm">Pick a person from the left to start chatting.</p>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+      </div>
 
       <CreateGroupDialog
         open={isCreateGroupOpen}
         onOpenChange={setIsCreateGroupOpen}
-        onGroupCreated={() => {
-          fetchChats();
-          // Optionally auto-open the new chat, currently fetchChats just reloads list
-        }}
+        onGroupCreated={() => fetchChats()}
       />
 
-      <BottomNav />
-
-      {/* Individual Chat View */}
-      <AnimatePresence>
-        {activeChat && (
-          <ChatView
-            chat={activeChat}
-            onBack={handleChatBack}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 };

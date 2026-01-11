@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, CheckCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Message {
   id: string;
@@ -34,9 +35,9 @@ const MessageBubble = ({
   const getStatusIcon = () => {
     switch (message.status) {
       case "sent":
-        return <Check className="h-3 w-3" />;
+        return <Check className="h-3 w-3 text-muted-foreground/70" />;
       case "delivered":
-        return <CheckCheck className="h-3 w-3" />;
+        return <CheckCheck className="h-3 w-3 text-muted-foreground/70" />;
       case "read":
         return <CheckCheck className="h-3 w-3 text-primary" />;
       default:
@@ -74,9 +75,9 @@ const MessageBubble = ({
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay: index * 0.05 }}
-      className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+      className={cn("flex flex-col mb-1", isMe ? "items-end" : "items-start")}
     >
-      <div className={`relative max-w-[80%] ${isMe ? "flex flex-col items-end" : "flex flex-col items-start"}`}>
+      <div className={cn("relative max-w-[85%] md:max-w-[70%]", isMe ? "flex flex-col items-end" : "flex flex-col items-start")}>
         {/* Reaction Picker */}
         <AnimatePresence>
           {isSelected && (
@@ -84,7 +85,7 @@ const MessageBubble = ({
               initial={{ opacity: 0, y: 10, scale: 0.8 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.8 }}
-              className={`absolute ${isMe ? "right-0" : "left-0"} -top-12 z-10`}
+              className={cn("absolute -top-12 z-10", isMe ? "right-0" : "left-0")}
             >
               <div className="flex gap-1 p-2 bg-card rounded-full border border-border shadow-lg">
                 {emojiReactions.map((emoji) => (
@@ -105,7 +106,7 @@ const MessageBubble = ({
 
         {/* Sender Name for Groups */}
         {!isMe && message.senderName && (
-          <span className={`text-xs font-semibold mb-1 ml-1 ${getSenderColor(message.senderName)}`}>
+          <span className={cn("text-[11px] font-semibold mb-1 ml-3", getSenderColor(message.senderName))}>
             {message.senderName}
           </span>
         )}
@@ -118,27 +119,48 @@ const MessageBubble = ({
             onLongPress();
           }}
           onClick={onLongPress}
-          className={`rounded-2xl ${isMe
-              ? "bg-primary text-primary-foreground rounded-br-md"
-              : "bg-card text-foreground rounded-bl-md"
-            } ${message.type === "text" ? "px-4 py-2" : "p-1"} cursor-pointer relative shadow-sm`}
+          className={cn(
+            "relative shadow-sm group",
+            message.type === "text" ? "px-4 py-2" : "p-1",
+            isMe
+              ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-md"
+              : "bg-card text-foreground border border-border/50 rounded-2xl rounded-tl-md"
+          )}
         >
           {message.type === "text" && (
-            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            <div className="flex flex-col">
+              <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
+              <div className={cn("flex items-center gap-1 mt-1 select-none opacity-70", isMe ? "justify-end text-primary-foreground/80" : "justify-end text-muted-foreground")}>
+                <span className="text-[10px]">{message.timestamp}</span>
+                {isMe && <span className="opacity-90">{getStatusIcon()}</span>}
+              </div>
+            </div>
           )}
           {message.type === "image" && (
-            <img
-              src={message.content}
-              alt="Shared image"
-              className="rounded-xl max-w-full max-h-60 object-cover"
-            />
+            <div className="relative">
+              <img
+                src={message.content}
+                alt="Shared"
+                className="rounded-xl max-w-full max-h-80 object-cover"
+              />
+              <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full text-white/90">
+                <span className="text-[10px]">{message.timestamp}</span>
+                {isMe && <span>{getStatusIcon()}</span>}
+              </div>
+            </div>
           )}
           {message.type === "gif" && (
-            <img
-              src={message.content}
-              alt="GIF"
-              className="rounded-xl max-w-full max-h-48 object-cover"
-            />
+            <div className="relative">
+              <img
+                src={message.content}
+                alt="GIF"
+                className="rounded-xl max-w-full max-h-60 object-cover"
+              />
+              <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full text-white/90">
+                <span className="text-[10px]">{message.timestamp}</span>
+                {isMe && <span>{getStatusIcon()}</span>}
+              </div>
+            </div>
           )}
         </motion.div>
 
@@ -147,26 +169,17 @@ const MessageBubble = ({
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className={`absolute -bottom-3 ${isMe ? "left-0" : "right-0"}`}
+            className={cn("absolute -bottom-2 z-10", isMe ? "right-2" : "left-2")}
           >
-            <div className="flex gap-0.5 bg-card rounded-full px-1.5 py-0.5 border border-border shadow-sm">
+            <div className="flex gap-0.5 bg-card/90 backdrop-blur rounded-full px-2 py-0.5 border border-border shadow-sm text-xs">
               {message.reactions.map((reaction, i) => (
-                <span key={i} className="text-xs">
+                <span key={i}>
                   {reaction}
                 </span>
               ))}
             </div>
           </motion.div>
         )}
-
-        {/* Timestamp and Status */}
-        <div
-          className={`flex items-center gap-1 mt-1 ${isMe ? "justify-end" : "justify-start"
-            } ${message.reactions?.length ? "mt-4" : ""}`}
-        >
-          <span className="text-[10px] text-muted-foreground">{message.timestamp}</span>
-          {isMe && <span className="text-muted-foreground">{getStatusIcon()}</span>}
-        </div>
       </div>
     </motion.div>
   );

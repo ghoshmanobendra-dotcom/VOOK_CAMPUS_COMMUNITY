@@ -1,9 +1,8 @@
-
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Phone, Video, MoreVertical, Send, Image, Smile, Mic, X,
-  Check, CheckCheck, AlertTriangle, Ban, Lightbulb, User, Volume2
+  Check, CheckCheck, AlertTriangle, Ban, Lightbulb, User, Volume2, Search, Plus, Paperclip
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,6 +21,7 @@ import { ChatListItem } from "@/pages/Chats";
 import { toast } from "sonner";
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import GroupInfoDialog from "./GroupInfoDialog";
+import { cn } from "@/lib/utils";
 
 export interface Message {
   id: string;
@@ -38,9 +38,10 @@ export interface Message {
 interface ChatViewProps {
   chat: ChatListItem;
   onBack: () => void;
+  className?: string; // Added className support
 }
 
-const ChatView = ({ chat, onBack }: ChatViewProps) => {
+const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
   const { currentUser, refreshUnreadMessages, setActiveChatId } = usePosts();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -89,7 +90,6 @@ const ChatView = ({ chat, onBack }: ChatViewProps) => {
         setIsAnnouncement(data.is_announcement || false);
         setIsGroup(data.type === 'group' || data.is_announcement);
 
-        // Check if admin (creator OR admin role in participants)
         // Check if admin (creator OR admin role in participants)
         const { data: part } = await supabase
           .from('chat_participants')
@@ -206,8 +206,10 @@ const ChatView = ({ chat, onBack }: ChatViewProps) => {
         });
 
         if (newMsg.sender_id !== currentUser?.id) {
-          supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', newMsg.id);
-          refreshUnreadMessages();
+          try {
+            await supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', newMsg.id);
+            refreshUnreadMessages();
+          } catch (e) { console.error(e); }
         }
       })
       .on('presence', { event: 'sync' }, () => {
@@ -390,21 +392,17 @@ const ChatView = ({ chat, onBack }: ChatViewProps) => {
 
 
   return (
-    <motion.div
-      initial={{ x: "100%" }}
-      animate={{ x: 0 }}
-      exit={{ x: "100%" }}
-      transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed inset-0 z-[100] bg-background flex flex-col"
+    <div
+      className={cn("bg-background flex flex-col h-full w-full", className)}
     >
       {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border px-4 py-3"
+        className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border px-4 py-3 shadow-sm sm:px-6"
       >
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}>
+          <Button variant="ghost" size="icon" onClick={onBack} className="md:hidden">
             <ArrowLeft className="h-5 w-5" />
           </Button>
 
@@ -413,14 +411,14 @@ const ChatView = ({ chat, onBack }: ChatViewProps) => {
             onClick={() => isGroup ? setShowGroupInfo(true) : setShowProfileQuickView(true)}
           >
             <div className="relative">
-              <Avatar className="h-10 w-10">
+              <Avatar className="h-10 w-10 border border-border/50">
                 <AvatarImage src={chat.avatar} />
-                <AvatarFallback className="bg-muted text-foreground font-semibold text-sm">
+                <AvatarFallback className="bg-primary/20 text-primary font-semibold text-sm">
                   {chat.initials}
                 </AvatarFallback>
               </Avatar>
               {!isGroup && chat.isOnline && (
-                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-primary border-2 border-background" />
+                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
               )}
             </div>
             <div>
@@ -435,16 +433,31 @@ const ChatView = ({ chat, onBack }: ChatViewProps) => {
           </div>
 
           <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full hidden sm:flex">
+              <Phone className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full hidden sm:flex">
+              <Video className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-full">
+              <Search className="h-5 w-5" />
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-muted-foreground">
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-full">
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-card border-border">
+              <DropdownMenuContent align="end" className="bg-card border-border shadow-lg">
                 <DropdownMenuItem onClick={() => isGroup ? setShowGroupInfo(true) : setShowProfileQuickView(true)}>
                   <User className="h-4 w-4 mr-2" />
                   {isGroup ? "Group Info" : "View Profile"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-red-500 focus:text-red-500">
+                  <Ban className="h-4 w-4 mr-2" />
+                  Block User
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -453,8 +466,8 @@ const ChatView = ({ chat, onBack }: ChatViewProps) => {
       </motion.header>
 
       {/* Messages Area */}
-      <ScrollArea className="flex-1 px-4 py-4">
-        <div className="space-y-4">
+      <ScrollArea className="flex-1 px-4 py-4 bg-muted/10">
+        <div className="space-y-6 pb-4">
           {/* Announcement Banner */}
           {isAnnouncement && (
             <div className="flex flex-col items-center justify-center p-4 text-center my-4 opacity-80">
@@ -487,19 +500,19 @@ const ChatView = ({ chat, onBack }: ChatViewProps) => {
                 exit={{ opacity: 0, y: 10 }}
                 className="flex items-center gap-2"
               >
-                <Avatar className="h-8 w-8">
+                <Avatar className="h-6 w-6">
                   <AvatarImage src={chat.avatar} />
-                  <AvatarFallback className="bg-muted text-foreground font-semibold text-xs">
+                  <AvatarFallback className="bg-muted text-foreground font-semibold text-[10px]">
                     {chat.initials}
                   </AvatarFallback>
                 </Avatar>
-                <div className="bg-card rounded-2xl rounded-bl-md px-4 py-3">
+                <div className="bg-muted rounded-2xl rounded-bl-none px-3 py-2">
                   <div className="flex gap-1">
                     {[0, 1, 2].map((i) => (
                       <motion.span
                         key={i}
-                        className="w-2 h-2 bg-muted-foreground rounded-full"
-                        animate={{ y: [0, -4, 0] }}
+                        className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full"
+                        animate={{ y: [0, -3, 0] }}
                         transition={{
                           duration: 0.6,
                           repeat: Infinity,
@@ -555,7 +568,18 @@ const ChatView = ({ chat, onBack }: ChatViewProps) => {
           animate={{ opacity: 1, y: 0 }}
           className="sticky bottom-0 bg-background border-t border-border p-4"
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-end gap-2 max-w-4xl mx-auto">
+            <div className="flex gap-1 pb-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full text-muted-foreground hover:bg-muted"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+            </div>
+
             <input
               type="file"
               ref={fileInputRef}
@@ -563,23 +587,8 @@ const ChatView = ({ chat, onBack }: ChatViewProps) => {
               accept="image/*"
               className="hidden"
             />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              className="text-muted-foreground hover:text-primary shrink-0"
-            >
-              <Image className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowGifPicker(!showGifPicker)}
-              className="text-muted-foreground hover:text-secondary shrink-0"
-            >
-              <span className="text-sm font-bold">GIF</span>
-            </Button>
-            <div className="flex-1 relative">
+
+            <div className="flex-1 relative bg-muted/40 rounded-2xl border border-transparent focus-within:border-primary/30 focus-within:bg-muted/20 transition-all">
               <Input
                 placeholder="Type a message..."
                 value={inputValue}
@@ -588,28 +597,49 @@ const ChatView = ({ chat, onBack }: ChatViewProps) => {
                   handleTyping();
                 }}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                className="pr-10 bg-card border-border focus:border-primary"
+                className="pr-24 pl-4 py-6 bg-transparent border-none focus-visible:ring-0 shadow-none text-base"
               />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setShowEmojiPicker(!showEmojiPicker);
-                  setShowGifPicker(false);
-                }}
-                className={`absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 ${showEmojiPicker ? "text-primary" : "text-muted-foreground"} hover:text-primary`}
-              >
-                <Smile className="h-4 w-4" />
-              </Button>
+
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowGifPicker(!showGifPicker)}
+                  className="text-muted-foreground hover:text-primary h-8 w-8 rounded-full"
+                  title="GIF"
+                >
+                  <div className="border border-current rounded px-1 text-[9px] font-bold">GIF</div>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-muted-foreground hover:text-primary h-8 w-8 rounded-full"
+                >
+                  <Image className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setShowEmojiPicker(!showEmojiPicker);
+                    setShowGifPicker(false);
+                  }}
+                  className={cn("h-8 w-8 rounded-full transition-colors", showEmojiPicker ? "text-primary" : "text-muted-foreground hover:text-primary")}
+                >
+                  <Smile className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="pb-1">
               <Button
                 size="icon"
                 onClick={handleSend}
                 disabled={!inputValue.trim()}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 h-11 w-11 rounded-full shadow-md"
               >
-                <Send className="h-5 w-5" />
+                <Send className="h-5 w-5 ml-0.5" />
               </Button>
             </motion.div>
           </div>
@@ -628,7 +658,7 @@ const ChatView = ({ chat, onBack }: ChatViewProps) => {
         open={showGroupInfo}
         onOpenChange={setShowGroupInfo}
       />
-    </motion.div>
+    </div>
   );
 };
 
