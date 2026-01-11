@@ -272,8 +272,16 @@ const StatusSection = () => {
     };
 
     // --- 4. Viewing Logic ---
-    const activeUserStories = viewingUserId ? groupedStories[viewingUserId] : [];
-    const activeStory = activeUserStories ? activeUserStories[activeStoryIndex] : null;
+    const activeUserStories = (viewingUserId && groupedStories[viewingUserId]) ? groupedStories[viewingUserId] : [];
+    const activeStory = activeUserStories.length > 0 ? activeUserStories[activeStoryIndex] : null;
+
+    useEffect(() => {
+        if (viewingUserId) {
+            console.log("Viewing User:", viewingUserId);
+            console.log("Active Stories:", activeUserStories);
+            console.log("Active Story:", activeStory);
+        }
+    }, [viewingUserId, activeStoryIndex, activeStory]);
 
     useEffect(() => {
         setImgSrc(null);
@@ -703,7 +711,14 @@ const StatusSection = () => {
             {/* --- STORY VIEWER OVERLAY (Portal) --- */}
             {viewingUserId && createPortal(
                 <div className="fixed inset-0 z-[9999] w-screen h-[100dvh] bg-black flex flex-col relative overflow-hidden touch-none overscroll-none">
-                    {activeStory && (
+                    {!activeStory ? (
+                        <div className="flex flex-col items-center justify-center h-full text-white/50 gap-4">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                            <p>Loading story...</p>
+                            {/* Fallback Close */}
+                            <Button size="sm" variant="outline" className="mt-4 bg-transparent border-white/20 text-white" onClick={() => setViewingUserId(null)}>Close</Button>
+                        </div>
+                    ) : (
                         <>
                             {/* Background Blur */}
                             <div className="absolute inset-0 z-0 opacity-30">
