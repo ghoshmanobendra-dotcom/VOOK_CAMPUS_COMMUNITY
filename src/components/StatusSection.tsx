@@ -29,6 +29,7 @@ const COLORS = ["#FFFFFF", "#000000", "#EF4444", "#F59E0B", "#10B981", "#3B82F6"
 interface Story {
     id: string;
     media: string;
+    media_type: 'image' | 'video';
     caption: string;
     captionPosition: { x: number; y: number };
     captionColor: string;
@@ -48,6 +49,7 @@ interface Story {
     hasUpvoted: boolean;
     viewCount: number;
     isOwner: boolean;
+    isViewed: boolean;
 }
 
 const StatusSection = () => {
@@ -103,14 +105,16 @@ const StatusSection = () => {
         console.log("fetchStories init", { realUserId });
         try {
             setIsLoadingStories(true);
+            const { data: { user } } = await supabase.auth.getUser();
 
-            // 1. Core Fetch: Stories that haven't expired
+            // 1. Fetch Active Stories + Profiles + My Views
             const { data, error } = await supabase
                 .from('stories')
                 .select(`
                     *,
                     profiles:user_id ( id, username, full_name, avatar_url ),
-                    story_likes ( user_id )
+                    story_likes ( user_id ),
+                    story_views ( viewer_id )
                 `)
                 .gt('expires_at', new Date().toISOString())
                 .order('created_at', { ascending: true });
@@ -120,43 +124,50 @@ const StatusSection = () => {
                 throw error;
             }
 
-            console.log("Raw Stories Fetched:", data?.length || 0);
+            console.log("Raw Stories:", data?.length || 0);
 
-            if (data) {
+            if (data && user) {
+                const myId = user.id;
+
                 // 2. Map & Format
-                const stories: Story[] = data.map((s: any) => ({
-                    id: s.id,
-                    media: s.media_url,
-                    caption: s.caption || "",
-                    captionPosition: s.caption_settings?.x !== undefined ? { x: s.caption_settings.x, y: s.caption_settings.y } : { x: 0, y: 0 },
-                    captionColor: s.caption_settings?.color || "#FFFFFF",
-                    captionSize: s.caption_settings?.size || 24,
-                    filter: s.filter_name || "Normal",
-                    timestamp: s.created_at,
-                    visibility: (s.visibility as 'public' | 'campus' | 'followers') || 'campus',
-                    campus_id: s.campus_id || 'Campus',
-                    user: {
-                        id: s.profiles?.id || s.user_id || "unknown",
-                        username: s.profiles?.username || "Unknown",
-                        name: s.profiles?.full_name || s.profiles?.username || "Unknown",
-                        avatar: s.profiles?.avatar_url || "",
-                        initials: (s.profiles?.full_name || "U")[0],
-                    },
-                    upvotes: s.story_likes?.length || 0,
-                    hasUpvoted: realUserId ? s.story_likes?.some((l: any) => l.user_id === realUserId) : false,
-                    viewCount: 0,
-                    isOwner: realUserId ? s.user_id === realUserId : false
-                }));
+                const formattedStories: Story[] = data.map((s: any) => {
+                    const iHaveViewed = s.story_views?.some((v: any) => v.viewer_id === myId);
+
+                    return {
+                        id: s.id,
+                        media: s.media_url,
+                        media_type: s.media_type || 'image',
+                        caption: s.caption || "",
+                        captionPosition: s.caption_settings ? { x: s.caption_settings.x, y: s.caption_settings.y } : { x: 0, y: 0 },
+                        captionColor: s.caption_settings?.color || "#FFFFFF",
+                        captionSize: s.caption_settings?.size || 24,
+                        filter: s.filter_name || "Normal",
+                        timestamp: s.created_at,
+                        visibility: s.visibility || 'public',
+                        campus_id: s.campus_id || 'Campus',
+                        user: {
+                            id: s.profiles?.id || s.user_id || "unknown",
+                            username: s.profiles?.username || "Unknown",
+                            name: s.profiles?.full_name || s.profiles?.username || "Unknown",
+                            avatar: s.profiles?.avatar_url || "",
+                            initials: (s.profiles?.full_name || "U")[0],
+                        },
+                        upvotes: s.story_likes?.length || 0,
+                        hasUpvoted: s.story_likes?.some((l: any) => l.user_id === myId),
+                        viewCount: s.story_views?.length || 0,
+                        isOwner: s.user_id === myId,
+                        isViewed: iHaveViewed || s.user_id === myId
+                    };
+                });
 
                 // 3. Group by User
-                const grouped = stories.reduce((acc, story) => {
+                const grouped = formattedStories.reduce((acc, story) => {
                     const uid = story.user.id;
                     if (!acc[uid]) acc[uid] = [];
                     acc[uid].push(story);
                     return acc;
                 }, {} as Record<string, Story[]>);
 
-                console.log("Grouped Stories:", Object.keys(grouped).length, "users");
                 setGroupedStories(grouped);
             }
         } catch (err: any) {
@@ -282,13 +293,32 @@ const StatusSection = () => {
     const activeUserStories = (viewingUserId && groupedStories[viewingUserId]) ? groupedStories[viewingUserId] : [];
     const activeStory = activeUserStories.length > 0 ? activeUserStories[activeStoryIndex] : null;
 
+    // --- Track Views ---
+    const trackedStories = useRef(new Set<string>());
+
     useEffect(() => {
-        if (viewingUserId) {
-            console.log("Viewing User:", viewingUserId);
-            console.log("Active Stories:", activeUserStories);
-            console.log("Active Story:", activeStory);
-        }
-    }, [viewingUserId, activeStoryIndex, activeStory]);
+        if (!activeStory || !realUserId) return;
+
+        // Prevent duplicate view call if already just tracked or user is owner
+        if (activeStory.isOwner) return;
+        if (trackedStories.current.has(activeStory.id)) return;
+        if (activeStory.isViewed) return; // Already initially loaded as viewed
+
+        const recordView = async () => {
+            trackedStories.current.add(activeStory.id);
+            // Optimistic update local state (optional but good for UI)
+            // But real refetch happens or we just rely on next load.
+            // Insert view
+            await supabase.from('story_views').upsert(
+                { story_id: activeStory.id, viewer_id: realUserId },
+                { onConflict: 'story_id, viewer_id', ignoreDuplicates: true }
+            );
+        };
+
+        recordView();
+
+        // Trigger generic refresh? No, might cause flicker. Just track silent.
+    }, [activeStory, realUserId]);
 
     useEffect(() => {
         setImgSrc(null);
@@ -299,10 +329,10 @@ const StatusSection = () => {
     useEffect(() => {
         if (activeStory && realUserId && !activeStory.isOwner) {
             const markViewed = async () => {
-                await supabase.from('story_views').insert({
-                    story_id: activeStory.id,
-                    viewer_id: realUserId
-                }).maybeSingle(); // ignore duplicates
+                await supabase.from('story_views').upsert(
+                    { story_id: activeStory.id, viewer_id: realUserId },
+                    { onConflict: 'story_id, viewer_id', ignoreDuplicates: true }
+                );
             };
             markViewed();
         }
@@ -530,37 +560,51 @@ const StatusSection = () => {
                     </div>
 
                     {/* Other Users Stories */}
-                    {otherUserIds.map((uid) => {
-                        const userStories = groupedStories[uid];
-                        const user = userStories[0].user;
-                        return (
-                            <div key={uid} className="flex flex-col items-center gap-2">
-                                <motion.div
-                                    whileHover={{ scale: 1.05 }}
-                                    className="relative cursor-pointer"
+                    {/* --- 2. Stories List (Sorted: Unseen First) --- */}
+                    {Object.entries(groupedStories)
+                        .sort(([uidA, storiesA], [uidB, storiesB]) => {
+                            // Sorting Rules:
+                            // 1. Own story always first? Optional. Maybe stick to Unseen > Seen
+                            const hasUnseenA = storiesA.some(s => !s.isViewed);
+                            const hasUnseenB = storiesB.some(s => !s.isViewed);
+                            if (hasUnseenA && !hasUnseenB) return -1;
+                            if (!hasUnseenA && hasUnseenB) return 1;
+                            // Then by Latest Timestamp
+                            const latestA = Math.max(...storiesA.map(s => new Date(s.timestamp).getTime()));
+                            const latestB = Math.max(...storiesB.map(s => new Date(s.timestamp).getTime()));
+                            return latestB - latestA;
+                        })
+                        .map(([userId, stories]) => {
+                            const user = stories[0].user;
+                            const isAllViewed = stories.every(s => s.isViewed);
+                            const hasNew = !isAllViewed;
+
+                            return (
+                                <div
+                                    key={userId}
+                                    className="flex flex-col items-center gap-1 cursor-pointer min-w-[70px]"
                                     onClick={() => {
-                                        setViewingUserId(uid);
-                                        setActiveStoryIndex(0);
+                                        setViewingUserId(userId);
+                                        // Find first unseen story index
+                                        const firstUnseenIndex = stories.findIndex(s => !s.isViewed);
+                                        setActiveStoryIndex(firstUnseenIndex !== -1 ? firstUnseenIndex : 0);
                                     }}
                                 >
-                                    <div className={`rounded-full p-[3px] ${
-                                        // TODO: Add 'allViewed' logic using local tracking or fetched 'story_views' check
-                                        true
-                                            ? 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500'
-                                            : 'bg-zinc-700'
+                                    <div className={`rounded-full p-[3px] transition-all duration-300 ${hasNew
+                                        ? 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500 animate-in spin-in-1'
+                                        : 'bg-zinc-700'
                                         }`}>
                                         <Avatar className="h-16 w-16 border-4 border-black bg-zinc-900">
                                             <AvatarImage src={user.avatar} className="object-cover" />
                                             <AvatarFallback>{user.initials}</AvatarFallback>
                                         </Avatar>
                                     </div>
-                                </motion.div>
-                                <span className="text-xs font-medium text-white/80 w-16 truncate text-center">
-                                    {user.username}
-                                </span>
-                            </div>
-                        );
-                    })}
+                                    <span className="text-xs text-white/90 truncate w-16 text-center">
+                                        {userId === realUserId ? "Your Story" : user.name.split(' ')[0]}
+                                    </span>
+                                </div>
+                            );
+                        })}
                 </div>
                 <ScrollBar orientation="horizontal" className="hidden" />
             </ScrollArea>
