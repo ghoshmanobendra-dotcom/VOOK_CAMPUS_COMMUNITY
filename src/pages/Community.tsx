@@ -328,17 +328,36 @@ const Community = () => {
             >
               {/* 1. Sidebar */}
               <CommunitySidebar
-                communities={communities.map(c => ({ id: c.id, name: c.name, image_url: c.image_url }))}
-                selectedCommunityId={selectedCommunity.id}
-                onSelectCommunity={setSelectedCommunity}
-                onAddGroup={() => setIsAddGroupOpen(true)}
+                communityName={selectedCommunity.name}
+                groups={linkedGroups}
+                onBack={() => setSelectedCommunity(null)}
+                onSelectGroup={openGroupChat}
+                onAddGroup={() => {
+                  // Reuse existing logic but might need a slight tweak if we want "New Group" vs "Add Existing"
+                  // The existing logic for 'isAddGroupOpen' was actually for 'Adding Existing Group' in the previous code?
+                  // Let's check:
+                  // 'isAddGroupOpen' triggers the "Add Existing Group" dialog.
+                  // We need a way to create a NEW group as well.
+                  // For now, let's map: "Create new group" -> navigate to chat creation (or wizard?)
+                  // "Add existing group" -> isAddGroupOpen(true)
+
+                  // Wait, previous prompt said "Add group" (new/existing logic).
+                  // Let's redirect "Create new Group" to the /chats with a create intent or similar?
+                  // Actually, looking at handleCreateCommunity, it creates an announcement chat.
+                  // Creating a generic group chat inside a community is usually a separate flow?
+                  // "Add group" in sidebar usually means "Create Channel".
+                  // Let's use a toast for "Create New" for now or redirect to chats?
+                  // BETTER: Map "Add Existing" to isAddGroupOpen. Map "Create New" to a simple toast or stub for now, or redirect to chats page.
+                  // The user said "create a adding other groups options to add existing chat groups".
+                  toast({ title: "Coming Soon", description: "Create new group feature is coming soon." });
+                }}
+                onAddExistingGroup={() => setIsAddGroupOpen(true)}
               />
 
               {/* Mobile Back Button (Top Left Overlay if on mobile) or handle in header? */}
-              {/* For now, relying on Sidebar being hidden on mobile and standard back navigation if needed, 
-                    but simpler to just have a 'Back' button in DetailView maybe? 
+              {/* For now, relying on Sidebar being hidden on mobile and standard back navigation if needed,
+                    but simpler to just have a 'Back' button in DetailView maybe?
                     Actually, let's inject a specialized back/home handler for mobile in Detail View context or header.
-                    However, the sidebar is hidden on md:flex. On mobile, we might need a way to go back to list.
                 */}
 
               {/* 2. Main Content Area */}

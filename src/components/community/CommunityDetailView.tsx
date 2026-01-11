@@ -7,6 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import TiltCard from "@/components/TiltCard";
 
+import CommunityPostEditor from "./CommunityPostEditor";
+
 interface CommunityDetailViewProps {
     community: any;
     groups: any[];
@@ -17,6 +19,8 @@ interface CommunityDetailViewProps {
 
 const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncement, onInvite }: CommunityDetailViewProps) => {
     const [activeTab, setActiveTab] = useState("posts");
+    const [isEditorOpen, setIsEditorOpen] = useState(false);
+    const [editorMode, setEditorMode] = useState<"post" | "announcement">("post");
 
     return (
         <div className="flex-1 flex flex-col h-full bg-background/50 overflow-hidden relative">
@@ -97,34 +101,61 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                         <div className="space-y-6">
 
                             {/* Input Area */}
-                            <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
-                                <div className="flex gap-4">
-                                    <Avatar className="h-10 w-10">
-                                        <AvatarFallback className="bg-primary/10 text-primary">ME</AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1 space-y-3">
-                                        <Input
-                                            placeholder="Post in group..."
-                                            className="bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/20"
-                                        />
-                                        <div className="flex items-center gap-2">
-                                            <Button variant="secondary" size="sm" className="h-8 gap-2">
-                                                <MessageSquare className="w-4 h-4" />
-                                                Post
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-8 gap-2 text-muted-foreground hover:text-foreground"
-                                                onClick={onOpenAnnouncement}
+                            {/* Input Area / Editor */}
+                            {isEditorOpen ? (
+                                <CommunityPostEditor
+                                    communityId={community.id}
+                                    communityName={community.name}
+                                    onCancel={() => setIsEditorOpen(false)}
+                                    onSuccess={() => setIsEditorOpen(false)}
+                                    defaultType={editorMode}
+                                />
+                            ) : (
+                                <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+                                    <div className="flex gap-4">
+                                        <Avatar className="h-10 w-10">
+                                            <AvatarFallback className="bg-primary/10 text-primary">ME</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1 space-y-3">
+                                            <div
+                                                className="bg-muted/50 border border-transparent rounded-md px-4 py-2 text-muted-foreground text-sm cursor-text hover:bg-muted transition-colors"
+                                                onClick={() => {
+                                                    setEditorMode("post");
+                                                    setIsEditorOpen(true);
+                                                }}
                                             >
-                                                <Volume2 className="w-4 h-4" />
-                                                Announcement
-                                            </Button>
+                                                Post in group...
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    className="h-8 gap-2"
+                                                    onClick={() => {
+                                                        setEditorMode("post");
+                                                        setIsEditorOpen(true);
+                                                    }}
+                                                >
+                                                    <MessageSquare className="w-4 h-4" />
+                                                    Post
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 gap-2 text-muted-foreground hover:text-foreground"
+                                                    onClick={() => {
+                                                        setEditorMode("announcement");
+                                                        setIsEditorOpen(true);
+                                                    }}
+                                                >
+                                                    <Volume2 className="w-4 h-4" />
+                                                    Announcement
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Setup Cards (Empty State / Onboarding) */}
                             {groups.length <= 1 && (
