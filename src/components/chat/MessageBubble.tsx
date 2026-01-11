@@ -18,6 +18,7 @@ interface MessageBubbleProps {
   message: Message;
   isSelected: boolean;
   onLongPress: () => void;
+  onDoubleClick?: () => void;
   onReaction: (emoji: string) => void;
   emojiReactions: string[];
   index: number;
@@ -27,6 +28,7 @@ const MessageBubble = ({
   message,
   isSelected,
   onLongPress,
+  onDoubleClick,
   onReaction,
   emojiReactions,
   index,
@@ -74,32 +76,18 @@ const MessageBubble = ({
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay: index * 0.05 }}
-      className={cn("flex flex-col mb-1", isMe ? "items-end" : "items-start")}
+      className={cn("flex flex-col mb-1 relative transition-colors duration-200",
+        isMe ? "items-end" : "items-start",
+        isSelected && "bg-primary/10 -mx-4 px-4 py-1" // Highlight container
+      )}
     >
       <div className={cn("relative max-w-[85%] md:max-w-[70%]", isMe ? "flex flex-col items-end" : "flex flex-col items-start")}>
-        {/* Reaction Picker */}
+        {/* Reaction Picker - Only show if specifically requested via long press, or changing logic */}
         <AnimatePresence>
-          {isSelected && (
+          {isSelected && false && ( // Disabled default popup for now, handled by parent or different UI if selection is for actions
             <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.8 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.8 }}
-              className={cn("absolute -top-12 z-10", isMe ? "right-0" : "left-0")}
-            >
-              <div className="flex gap-1 p-2 bg-card rounded-full border border-border shadow-lg">
-                {emojiReactions.map((emoji) => (
-                  <motion.button
-                    key={emoji}
-                    whileHover={{ scale: 1.3 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => onReaction(emoji)}
-                    className="text-lg p-1 hover:bg-muted rounded-full transition-colors"
-                  >
-                    {emoji}
-                  </motion.button>
-                ))}
-              </div>
-            </motion.div>
+            // ... 
+            />
           )}
         </AnimatePresence>
 
@@ -117,13 +105,15 @@ const MessageBubble = ({
             e.preventDefault();
             onLongPress();
           }}
-          onClick={onLongPress}
+          onClick={onLongPress} // Keep single click for reaction/details if needed, user said double click for selection
+          onDoubleClick={onDoubleClick}
           className={cn(
-            "relative shadow-sm group",
+            "relative shadow-sm group cursor-pointer",
             message.type === "text" ? "px-4 py-2" : "p-1.5",
             isMe
               ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-md"
-              : "bg-card text-foreground border border-border/50 rounded-2xl rounded-tl-md"
+              : "bg-card text-foreground border border-border/50 rounded-2xl rounded-tl-md",
+            isSelected && "ring-2 ring-primary ring-offset-1" // Ring for selection visibility on the bubble itself
           )}
         >
           {message.type === "text" && (

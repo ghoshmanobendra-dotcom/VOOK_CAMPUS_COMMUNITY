@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Phone, Video, MoreVertical, Send, Image as ImageIcon, Smile, Mic, X,
   Check, CheckCheck, AlertTriangle, Ban, Lightbulb, User, Volume2, Search, Plus, Paperclip,
-  FileText, MessageSquare, Download
+  FileText, MessageSquare, Download, Trash2, Pin, BellOff, Mail, Forward, Copy
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -58,7 +58,7 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showProfileQuickView, setShowProfileQuickView] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<'chat' | 'files' | 'photos'>('chat');
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -429,6 +429,50 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
   };
 
 
+  const toggleSelection = (id: string) => {
+    setSelectedMessageIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedMessageIds(new Set());
+
+  const handleDelete = async () => {
+    if (selectedMessageIds.size > 0) {
+      // Delete selected messages
+      const ids = Array.from(selectedMessageIds);
+      try {
+        const { error } = await supabase.from('messages').delete().in('id', ids);
+        if (error) throw error;
+        setMessages(prev => prev.filter(m => !selectedMessageIds.has(m.id)));
+        toast.success(`Deleted ${selectedMessageIds.size} message(s)`);
+        clearSelection();
+      } catch (e) {
+        toast.error("Failed to delete messages");
+      }
+    } else {
+      // Delete Chat (Mock or Real)
+      if (window.confirm("Delete this chat?")) {
+        // Logic to delete chat would go here
+        toast.success("Chat deleted");
+        onBack();
+      }
+    }
+  };
+
+  const handlePin = () => {
+    if (selectedMessageIds.size > 0) {
+      toast.success("Messages pinned");
+      clearSelection();
+    } else {
+      toast.success("Chat pinned");
+    }
+  };
+
+
   return (
     <div
       className={cn("bg-background flex flex-col h-full w-full", className)}
@@ -505,26 +549,68 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full hidden sm:flex">
               <Video className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-full">
-              <Search className="h-5 w-5" />
-            </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-full">
+                <Button variant="ghost" size="icon" className={cn("rounded-full", selectedMessageIds.size > 0 ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground")}>
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-card border-border shadow-lg">
-                <DropdownMenuItem onClick={() => isGroup ? setShowGroupInfo(true) : setShowProfileQuickView(true)}>
-                  <User className="h-4 w-4 mr-2" />
-                  {isGroup ? "Group Info" : "View Profile"}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-500 focus:text-red-500">
-                  <Ban className="h-4 w-4 mr-2" />
-                  Block User
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="bg-card border-border shadow-lg min-w-[200px]">
+                {selectedMessageIds.size > 0 ? (
+                  <>
+                    <DropdownMenuItem onClick={handleDelete} className="text-red-500 focus:text-red-500 cursor-pointer">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete {selectedMessageIds.size > 1 ? `(${selectedMessageIds.size})` : ""}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handlePin} className="cursor-pointer">
+                      <Pin className="h-4 w-4 mr-2" />
+                      Pin Messages
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { toast.success("Copied to clipboard"); clearSelection(); }} className="cursor-pointer">
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { toast.success("Forwarded"); clearSelection(); }} className="cursor-pointer">
+                      <Forward className="h-4 w-4 mr-2" />
+                      Forward
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={clearSelection} className="cursor-pointer">
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel Selection
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuItem onClick={() => isGroup ? setShowGroupInfo(true) : setShowProfileQuickView(true)} className="cursor-pointer">
+                      <User className="h-4 w-4 mr-2" />
+                      {isGroup ? "Group Info" : "View Profile"}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => toast.success("Marked as unread")} className="cursor-pointer">
+                      <Mail className="h-4 w-4 mr-2" />
+                      Mark as unread
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => toast.success("Chat pinned")} className="cursor-pointer">
+                      <Pin className="h-4 w-4 mr-2" />
+                      Pin
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => toast.success("Notifications muted")} className="cursor-pointer">
+                      <BellOff className="h-4 w-4 mr-2" />
+                      Mute
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleDelete} className="text-red-500 focus:text-red-500 cursor-pointer">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Chat
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-red-500 focus:text-red-500 cursor-pointer">
+                      <Ban className="h-4 w-4 mr-2" />
+                      Block User
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -550,8 +636,9 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
               <MessageBubble
                 key={message.id}
                 message={message}
-                isSelected={selectedMessageId === message.id}
-                onLongPress={() => setSelectedMessageId(message.id)}
+                isSelected={selectedMessageIds.has(message.id)}
+                onLongPress={() => toggleSelection(message.id)}
+                onDoubleClick={() => toggleSelection(message.id)}
                 onReaction={(emoji) => { }}
                 emojiReactions={[]}
                 index={index}
