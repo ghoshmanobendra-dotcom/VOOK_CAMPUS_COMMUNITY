@@ -45,6 +45,7 @@ export interface FeedPostData {
         url: string;
         type: string;
     }[];
+    communityId?: string;
 }
 
 interface PostContextType {
@@ -413,6 +414,7 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                 content: newPostData.content,
                 image_urls: newPostData.images || [],
                 community_tag: newPostData.communityTag,
+                community_id: newPostData.communityId, // <--- Add this
                 is_official: false,
                 is_anonymous: isAnonymousMode,
                 created_at: new Date().toISOString(),

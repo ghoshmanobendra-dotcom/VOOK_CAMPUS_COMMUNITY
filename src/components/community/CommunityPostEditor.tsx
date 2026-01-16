@@ -88,6 +88,7 @@ const CommunityPostEditor = ({ communityId, communityName, onCancel, onSuccess, 
                 content: finalContent,
                 images: imageUrls,
                 author: currentUser,
+                communityId: communityId,
                 communityTag: communityName, // Tagging with community name
                 isOfficial: postType === 'announcement',
                 isAnonymous: false, // Defaulting for visual consistency with request

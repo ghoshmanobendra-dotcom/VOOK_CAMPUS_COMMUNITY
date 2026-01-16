@@ -183,7 +183,7 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                             {/* Section 2: Posts / Announcements (Feed View) */}
                             <div className="space-y-4">
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider hidden">Feed</h3>
-                                <CommunityFeed communityName={community.name} />
+                                <CommunityFeed communityId={community.id} communityName={community.name} />
                             </div>
                         </div>
                     )}

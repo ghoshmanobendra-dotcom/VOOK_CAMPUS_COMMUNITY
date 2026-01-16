@@ -26,6 +26,7 @@ const CommunitySidebar = ({
     groups,
     onBack,
     onSelectGroup,
+    onAddGroup,
     onAddExistingGroup
 }: CommunitySidebarProps) => {
     // Split groups into joined and not joined
@@ -62,7 +63,7 @@ const CommunitySidebar = ({
 
                         {/* Add Group Action (Styled as a list item) */}
                         <div
-                            onClick={onAddExistingGroup}
+                            onClick={onAddGroup}
                             className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-muted/50 transition-all border border-transparent group mb-2"
                         >
                             <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0 text-primary">

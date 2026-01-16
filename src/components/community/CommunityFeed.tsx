@@ -7,32 +7,33 @@ import { Loader2, Users } from "lucide-react";
 import { FeedPostData } from "@/context/PostContext"; // Reusing type or should import from a shared types file? FeedPostData is exported from PostContext.
 
 interface CommunityFeedProps {
+    communityId: string;
     communityName: string;
 }
 
-const CommunityFeed = ({ communityName }: CommunityFeedProps) => {
+const CommunityFeed = ({ communityId, communityName }: CommunityFeedProps) => {
     const { currentUser } = usePosts(); // Only need user, not global posts
     const [posts, setPosts] = useState<FeedPostData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchCommunityPosts = async () => {
         setIsLoading(true);
-        console.log("Fetching community posts for:", communityName);
+        console.log("Fetching community posts for:", communityName, communityId);
         try {
-            // Fetch posts where community_tag equals the community Name
+            // Fetch posts where community_id equals the community ID
+            // Fallback to community_tag if needed handled by migration, here we strictly use ID for new standard
             const { data: postsData, error } = await supabase
                 .from('posts')
                 .select(`
                     *,
                     profiles:user_id (id, full_name, username, avatar_url, college)
                 `)
-                .eq('community_tag', communityName)
+                .eq('community_id', communityId)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
 
             // Fetch likes/bookmarks for this user within this context
-            // Optimization: We could reuse a global "my likes" store, but fetching locally ensures accuracy for this isolated feed
             let userLikes: string[] = [];
 
             if (currentUser?.id) {
@@ -55,6 +56,7 @@ const CommunityFeed = ({ communityName }: CommunityFeedProps) => {
                     college: p.profiles?.college || "Campus",
                     id: p.profiles?.id
                 },
+                communityId: p.community_id,
                 communityTag: p.community_tag,
                 isOfficial: p.is_official,
                 isAnonymous: p.is_anonymous,
@@ -81,24 +83,20 @@ const CommunityFeed = ({ communityName }: CommunityFeedProps) => {
     };
 
     useEffect(() => {
-        if (communityName) {
+        if (communityId) {
             fetchCommunityPosts();
         }
 
         // Realtime Subscription SCOPED to this community
-        // Since we can't subscribe with a filter like 'community_tag=eq.Name' easily on 'posts' events if RLS doesn't restrict it,
-        // we subscribe to all inserts and client-side filter.
-        // OPTIMIZATION: If RLS policies are set up correctly, we might only receive relevant events.
-        // Assuming standard public table:
         const channel = supabase
-            .channel(`community_posts:${communityName}`)
+            .channel(`community_posts:${communityId}`)
             .on(
                 'postgres_changes',
                 {
                     event: '*',
                     schema: 'public',
                     table: 'posts',
-                    filter: `community_tag=eq.${communityName}` // FILTERING AT SOURCE (Supabase supports this for simple columns)
+                    filter: `community_id=eq.${communityId}`
                 },
                 (payload) => {
                     console.log("Community Realtime Event:", payload);
@@ -110,7 +108,7 @@ const CommunityFeed = ({ communityName }: CommunityFeedProps) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [communityName]);
+    }, [communityId]);
 
     const handleDelete = async (postId: string) => {
         try {

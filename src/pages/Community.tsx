@@ -51,6 +51,7 @@ const Community = () => {
   const [candidateGroups, setCandidateGroups] = useState<any[]>([]);
   const [selectedGroupsToAdd, setSelectedGroupsToAdd] = useState<string[]>([]);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [isDiscoverGroupsOpen, setIsDiscoverGroupsOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -223,6 +224,31 @@ const Community = () => {
     }
   };
 
+  const handleJoinGroup = async (groupId: string, groupName: string) => {
+    if (!currentUserId || !selectedCommunity) return;
+
+    try {
+      const { error } = await supabase
+        .from('chat_participants')
+        .insert({
+          chat_id: groupId,
+          user_id: currentUserId,
+          role: 'member'
+        });
+
+      if (error) throw error;
+
+      toast({ title: "Joined Group", description: `You have joined ${groupName}` });
+
+      // Refresh groups logic
+      fetchCommunityGroups(selectedCommunity.id);
+
+    } catch (e) {
+      console.error("Join group error:", e);
+      toast({ variant: "destructive", title: "Error", description: "Failed to join group." });
+    }
+  };
+
   const openGroupChat = (chat: any) => {
     navigate('/chats', {
       state: {
@@ -384,25 +410,7 @@ const Community = () => {
                 groups={linkedGroups}
                 onBack={() => setSelectedCommunity(null)}
                 onSelectGroup={openGroupChat}
-                onAddGroup={() => {
-                  // Reuse existing logic but might need a slight tweak if we want "New Group" vs "Add Existing"
-                  // The existing logic for 'isAddGroupOpen' was actually for 'Adding Existing Group' in the previous code?
-                  // Let's check:
-                  // 'isAddGroupOpen' triggers the "Add Existing Group" dialog.
-                  // We need a way to create a NEW group as well.
-                  // For now, let's map: "Create new group" -> navigate to chat creation (or wizard?)
-                  // "Add existing group" -> isAddGroupOpen(true)
-
-                  // Wait, previous prompt said "Add group" (new/existing logic).
-                  // Let's redirect "Create new Group" to the /chats with a create intent or similar?
-                  // Actually, looking at handleCreateCommunity, it creates an announcement chat.
-                  // Creating a generic group chat inside a community is usually a separate flow?
-                  // "Add group" in sidebar usually means "Create Channel".
-                  // Let's use a toast for "Create New" for now or redirect to chats?
-                  // BETTER: Map "Add Existing" to isAddGroupOpen. Map "Create New" to a simple toast or stub for now, or redirect to chats page.
-                  // The user said "create a adding other groups options to add existing chat groups".
-                  toast({ title: "Coming Soon", description: "Create new group feature is coming soon." });
-                }}
+                onAddGroup={() => setIsDiscoverGroupsOpen(true)}
                 onAddExistingGroup={() => setIsAddGroupOpen(true)}
               />
 
@@ -534,6 +542,45 @@ const Community = () => {
             >
               {selectedGroupsToAdd.length > 0 ? `Add ${selectedGroupsToAdd.length} Group${selectedGroupsToAdd.length > 1 ? 's' : ''}` : 'Select Groups'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Discover Groups Modal */}
+      <Dialog open={isDiscoverGroupsOpen} onOpenChange={setIsDiscoverGroupsOpen}>
+        <DialogContent className="max-w-md rounded-2xl top-[40%] bg-card/95 backdrop-blur-xl border border-border/50 shadow-2xl animate-in zoom-in-95 fade-in duration-300">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Discover Groups</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-3 mt-2 max-h-[50vh] overflow-y-auto px-1 py-1">
+            {linkedGroups.filter(g => !g.is_member).length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border/50">
+                <Users className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                <p className="font-medium">No new groups to join.</p>
+                <p className="text-xs mt-1 max-w-[200px] mx-auto opacity-70">You are already a member of all active groups in this community.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {linkedGroups.filter(g => !g.is_member).map(group => (
+                  <div key={group.id} className="flex items-center justify-between p-3 rounded-xl border bg-card/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10 border border-border/50">
+                        <AvatarImage src={group.image_url} />
+                        <AvatarFallback>{group.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm">{group.name}</span>
+                        <span className="text-xs text-muted-foreground">{group.member_count} members</span>
+                      </div>
+                    </div>
+                    <Button size="sm" onClick={() => handleJoinGroup(group.id, group.name)}>
+                      Join
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
