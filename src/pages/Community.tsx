@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, Users, Plus, Volume2, ArrowRight, Loader2, UserPlus, UserCheck, GraduationCap, Building2, ChevronRight, Hash, ShieldCheck, ChevronLeft, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import Header from "@/components/Header";
 import BottomNav from "@/components/BottomNav";
@@ -47,11 +48,11 @@ const Community = () => {
 
   // New State for Community Groups
   const [linkedGroups, setLinkedGroups] = useState<any[]>([]);
-  const [isAddGroupOpen, setIsAddGroupOpen] = useState(false);
   const [candidateGroups, setCandidateGroups] = useState<any[]>([]);
   const [selectedGroupsToAdd, setSelectedGroupsToAdd] = useState<string[]>([]);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
-  const [isDiscoverGroupsOpen, setIsDiscoverGroupsOpen] = useState(false);
+  const [isManageGroupsOpen, setIsManageGroupsOpen] = useState(false);
+  const [manageGroupTab, setManageGroupTab] = useState("discover"); // 'discover' | 'add'
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -70,11 +71,12 @@ const Community = () => {
   }, [selectedCommunity]);
 
   // Fetch groups eligible to be added
+  // Fetch groups eligible to be added
   useEffect(() => {
-    if (isAddGroupOpen && currentUserId) {
+    if (isManageGroupsOpen && manageGroupTab === 'add' && currentUserId) {
       fetchCandidateGroups();
     }
-  }, [isAddGroupOpen, currentUserId]);
+  }, [isManageGroupsOpen, manageGroupTab, currentUserId]);
 
   const fetchCommunities = async () => {
     const { data, error } = await supabase
@@ -215,7 +217,8 @@ const Community = () => {
       });
 
       fetchCommunityGroups(selectedCommunity.id);
-      setIsAddGroupOpen(false);
+      fetchCommunityGroups(selectedCommunity.id);
+      setIsManageGroupsOpen(false);
       setSelectedGroupsToAdd([]);
 
     } catch (err) {
@@ -410,8 +413,14 @@ const Community = () => {
                 groups={linkedGroups}
                 onBack={() => setSelectedCommunity(null)}
                 onSelectGroup={openGroupChat}
-                onAddGroup={() => setIsDiscoverGroupsOpen(true)}
-                onAddExistingGroup={() => setIsAddGroupOpen(true)}
+                onAddGroup={() => {
+                  setManageGroupTab("discover");
+                  setIsManageGroupsOpen(true);
+                }}
+                onAddExistingGroup={() => {
+                  setManageGroupTab("add");
+                  setIsManageGroupsOpen(true);
+                }}
               />
 
               {/* Mobile Back Button (Top Left Overlay if on mobile) or handle in header? */}
@@ -453,140 +462,144 @@ const Community = () => {
         initialTemplateId={initialTemplateId}
       />
 
-      {/* Dialog for Adding Groups (Preserved) */}
-      {/* Dialog for Adding Groups (Multi-select) */}
-      <Dialog open={isAddGroupOpen} onOpenChange={(open) => {
-        setIsAddGroupOpen(open);
-        if (!open) setSelectedGroupsToAdd([]); // Reset selection on close
-      }}>
+
+
+      {/* Combined Manage Groups Modal */}
+      <Dialog open={isManageGroupsOpen} onOpenChange={setIsManageGroupsOpen}>
         <DialogContent className="max-w-md rounded-2xl top-[40%] bg-card/95 backdrop-blur-xl border border-border/50 shadow-2xl animate-in zoom-in-95 fade-in duration-300">
           <DialogHeader>
-            <DialogTitle className="text-xl">Add Existing Groups</DialogTitle>
+            <DialogTitle className="text-xl">Groups</DialogTitle>
           </DialogHeader>
 
-          <div className="flex flex-col gap-3 mt-2 max-h-[50vh] overflow-y-auto px-1 py-1">
-            {isLoadingGroups ? (
-              <div className="py-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary/50" /></div>
-            ) : candidateGroups.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border/50">
-                <Users className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                <p className="font-medium">No eligible groups found.</p>
-                <p className="text-xs mt-1 max-w-[200px] mx-auto opacity-70">You must be an admin of a group not already in a community.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <AnimatePresence>
-                  {candidateGroups.map((group, index) => {
-                    const isSelected = selectedGroupsToAdd.includes(group.id);
-                    return (
-                      <motion.div
-                        key={group.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className={cn(
-                          "flex items-center justify-between p-3 rounded-xl cursor-pointer border transition-all duration-200",
-                          isSelected
-                            ? "bg-primary/10 border-primary/50 shadow-sm"
-                            : "bg-muted/30 border-transparent hover:bg-muted hover:border-border"
-                        )}
-                        onClick={() => {
-                          setSelectedGroupsToAdd(prev =>
-                            prev.includes(group.id)
-                              ? prev.filter(id => id !== group.id)
-                              : [...prev, group.id]
-                          );
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <Avatar className="h-10 w-10 border border-border/50">
-                              <AvatarImage src={group.image_url} />
-                              <AvatarFallback className="bg-muted text-muted-foreground">{group.name[0]}</AvatarFallback>
-                            </Avatar>
-                            {isSelected && (
-                              <motion.div
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5 shadow-sm"
-                              >
-                                <Check className="w-3 h-3" />
-                              </motion.div>
-                            )}
-                          </div>
-                          <div className="flex flex-col text-left">
-                            <span className={cn("font-medium text-sm transition-colors", isSelected && "text-primary")}>{group.name}</span>
-                            <span className="text-xs text-muted-foreground">{isSelected ? "Selected" : "Tap to select"}</span>
-                          </div>
-                        </div>
-                        <div className={cn(
-                          "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
-                          isSelected ? "bg-primary border-primary" : "border-muted-foreground/30 bg-background"
-                        )}>
-                          {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
-              </div>
-            )}
-          </div>
+          <Tabs value={manageGroupTab} onValueChange={setManageGroupTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="discover">Join Groups</TabsTrigger>
+              <TabsTrigger value="add">Add Existing</TabsTrigger>
+            </TabsList>
 
-          <div className="pt-2 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setIsAddGroupOpen(false)}>Cancel</Button>
-            <Button
-              onClick={handleAddGroupsToCommunity}
-              disabled={selectedGroupsToAdd.length === 0}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 transition-all"
-            >
-              {selectedGroupsToAdd.length > 0 ? `Add ${selectedGroupsToAdd.length} Group${selectedGroupsToAdd.length > 1 ? 's' : ''}` : 'Select Groups'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Discover Groups Modal */}
-      <Dialog open={isDiscoverGroupsOpen} onOpenChange={setIsDiscoverGroupsOpen}>
-        <DialogContent className="max-w-md rounded-2xl top-[40%] bg-card/95 backdrop-blur-xl border border-border/50 shadow-2xl animate-in zoom-in-95 fade-in duration-300">
-          <DialogHeader>
-            <DialogTitle className="text-xl">Discover Groups</DialogTitle>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-3 mt-2 max-h-[50vh] overflow-y-auto px-1 py-1">
-            {linkedGroups.filter(g => !g.is_member).length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border/50">
-                <Users className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                <p className="font-medium">No new groups to join.</p>
-                <p className="text-xs mt-1 max-w-[200px] mx-auto opacity-70">You are already a member of all active groups in this community.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {linkedGroups.filter(g => !g.is_member).map(group => (
-                  <div key={group.id} className="flex items-center justify-between p-3 rounded-xl border bg-card/50 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 border border-border/50">
-                        <AvatarImage src={group.image_url} />
-                        <AvatarFallback>{group.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <span className="font-medium text-sm">{group.name}</span>
-                        <span className="text-xs text-muted-foreground">{group.member_count} members</span>
-                      </div>
-                    </div>
-                    <Button size="sm" onClick={() => handleJoinGroup(group.id, group.name)}>
-                      Join
-                    </Button>
+            {/* TAB 1: DISCOVER / JOIN */}
+            <TabsContent value="discover" className="mt-4">
+              <div className="flex flex-col gap-3 max-h-[50vh] overflow-y-auto px-1 py-1">
+                {linkedGroups.filter(g => !g.is_member).length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border/50">
+                    <Users className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                    <p className="font-medium">No new groups to join.</p>
+                    <p className="text-xs mt-1 max-w-[200px] mx-auto opacity-70">You are already a member of all active groups in this community.</p>
                   </div>
-                ))}
+                ) : (
+                  <div className="space-y-3">
+                    {linkedGroups.filter(g => !g.is_member).map(group => (
+                      <div key={group.id} className="flex items-center justify-between p-3 rounded-xl border bg-card/50 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10 border border-border/50">
+                            <AvatarImage src={group.image_url} />
+                            <AvatarFallback>{group.name[0]}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-sm">{group.name}</span>
+                            <span className="text-xs text-muted-foreground">{group.member_count} members</span>
+                          </div>
+                        </div>
+                        <Button size="sm" onClick={() => handleJoinGroup(group.id, group.name)}>
+                          Join
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </TabsContent>
+
+            {/* TAB 2: ADD EXISTING */}
+            <TabsContent value="add" className="mt-4">
+              <div className="flex flex-col gap-3 max-h-[50vh] overflow-y-auto px-1 py-1">
+                {isLoadingGroups ? (
+                  <div className="py-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary/50" /></div>
+                ) : candidateGroups.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border/50">
+                    <Users className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                    <p className="font-medium">No eligible groups found.</p>
+                    <p className="text-xs mt-1 max-w-[200px] mx-auto opacity-70">
+                      You must be an admin of a group that is NOT already in a community.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <AnimatePresence>
+                      {candidateGroups.map((group, index) => {
+                        const isSelected = selectedGroupsToAdd.includes(group.id);
+                        return (
+                          <motion.div
+                            key={group.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className={cn(
+                              "flex items-center justify-between p-3 rounded-xl cursor-pointer border transition-all duration-200",
+                              isSelected
+                                ? "bg-primary/10 border-primary/50 shadow-sm"
+                                : "bg-muted/30 border-transparent hover:bg-muted hover:border-border"
+                            )}
+                            onClick={() => {
+                              setSelectedGroupsToAdd(prev =>
+                                prev.includes(group.id)
+                                  ? prev.filter(id => id !== group.id)
+                                  : [...prev, group.id]
+                              );
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="relative">
+                                <Avatar className="h-10 w-10 border border-border/50">
+                                  <AvatarImage src={group.image_url} />
+                                  <AvatarFallback className="bg-muted text-muted-foreground">{group.name[0]}</AvatarFallback>
+                                </Avatar>
+                                {isSelected && (
+                                  <motion.div
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5 shadow-sm"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                  </motion.div>
+                                )}
+                              </div>
+                              <div className="flex flex-col text-left">
+                                <span className={cn("font-medium text-sm transition-colors", isSelected && "text-primary")}>{group.name}</span>
+                                <span className="text-xs text-muted-foreground">{isSelected ? "Selected" : "Tap to select"}</span>
+                              </div>
+                            </div>
+                            <div className={cn(
+                              "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
+                              isSelected ? "bg-primary border-primary" : "border-muted-foreground/30 bg-background"
+                            )}>
+                              {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-4 flex justify-end gap-2 border-t border-border mt-2">
+                <Button variant="ghost" onClick={() => setIsManageGroupsOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={handleAddGroupsToCommunity}
+                  disabled={selectedGroupsToAdd.length === 0}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 transition-all"
+                >
+                  {selectedGroupsToAdd.length > 0 ? `Add ${selectedGroupsToAdd.length} Group${selectedGroupsToAdd.length > 1 ? 's' : ''}` : 'Select Groups'}
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
       <BottomNav />
-    </div>
+    </div >
   );
 };
 
