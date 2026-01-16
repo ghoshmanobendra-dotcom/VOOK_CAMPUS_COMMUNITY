@@ -32,6 +32,7 @@ interface Community {
   owner_id: string;
   created_at: string;
   announcement_chat_id?: string;
+  member_count?: number;
 }
 
 const Community = () => {
@@ -71,7 +72,6 @@ const Community = () => {
   }, [selectedCommunity]);
 
   // Fetch groups eligible to be added
-  // Fetch groups eligible to be added
   useEffect(() => {
     if (isManageGroupsOpen && manageGroupTab === 'add' && currentUserId) {
       fetchCandidateGroups();
@@ -86,7 +86,8 @@ const Community = () => {
         chats (
           id,
           is_announcement
-        )
+        ),
+        members:community_members(count)
       `)
       .order('created_at', { ascending: false });
 
@@ -95,7 +96,8 @@ const Community = () => {
     } else {
       const formatted = data?.map((comm: any) => ({
         ...comm,
-        announcement_chat_id: comm.chats?.find((c: any) => c.is_announcement)?.id
+        announcement_chat_id: comm.chats?.find((c: any) => c.is_announcement)?.id,
+        member_count: comm.members?.[0]?.count || 0
       }));
       setCommunities(formatted || []);
     }
@@ -387,7 +389,7 @@ const Community = () => {
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-base truncate">{comm.name}</h3>
                             <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                              <Users className="w-3 h-3" /> {Math.floor(Math.random() * 50) + 1} members
+                              <Users className="w-3 h-3" /> {comm.member_count !== undefined ? comm.member_count : 0} members
                             </p>
                           </div>
                           <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
