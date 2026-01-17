@@ -1,6 +1,6 @@
 import Header from "@/components/Header";
 import BottomNav from "@/components/BottomNav";
-import { Bell, Megaphone, BellRing, Heart, UserPlus, MessageCircle } from "lucide-react";
+import { Bell, Megaphone, BellRing, Heart, UserPlus, MessageCircle, ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -9,10 +9,14 @@ import TiltCard from "@/components/TiltCard";
 import { supabase } from "@/integrations/supabase/client";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePosts } from "@/context/PostContext";
+import { useNavigate } from "react-router-dom";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface NotificationItem {
     id: string;
-    type: 'follow' | 'like' | 'comment' | 'announcement' | 'message';
+    type: 'follow' | 'like' | 'comment' | 'announcement' | 'message' | 'post';
+    entity_type: 'post' | 'comment' | 'message' | 'profile' | 'community';
+    entity_id: string;
     content: string;
     is_read: boolean;
     created_at: string;
@@ -21,7 +25,6 @@ interface NotificationItem {
         username: string;
         avatar_url?: string;
     };
-    reference_id?: string;
 }
 
 const Alerts = () => {
@@ -29,6 +32,7 @@ const Alerts = () => {
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const { markNotificationsAsRead } = usePosts();
+    const navigate = useNavigate();
 
     useEffect(() => {
         if ("Notification" in window) {
@@ -48,16 +52,13 @@ const Alerts = () => {
                     table: 'notifications',
                 },
                 (payload) => {
-                    const newNotif = payload.new as NotificationItem;
-
-                    // Since we need sender details, we might need to fetch them or just show a generic alert first
-                    // For best UX, let's fetch the sender details immediately
-                    fetchSingleNotificationDetails(newNotif.id);
+                    // Fetch full details including sender
+                    fetchSingleNotificationDetails(payload.new.id);
 
                     // Browser Notification
                     if (Notification.permission === "granted") {
-                        new Notification("New Alert", {
-                            body: newNotif.content || "You have a new notification",
+                        new Notification("New Notification", {
+                            body: payload.new.content || "Check your alerts",
                             icon: "/icon.png"
                         });
                     }
@@ -71,7 +72,7 @@ const Alerts = () => {
     }, []);
 
     const fetchSingleNotificationDetails = async (id: string) => {
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('notifications')
             .select('*, sender:sender_id(full_name, username, avatar_url)')
             .eq('id', id)
@@ -96,7 +97,9 @@ const Alerts = () => {
             if (error) throw error;
             setNotifications(data || []);
 
-            // Optional: Mark all as read in backend
+            // Mark all as read after fetching (optional choice, or do it on interaction)
+            // Here we just fetch. 'markNotificationsAsRead' in context resets count.
+            // We usually want to mark db as read when "seen".
             if (data && data.length > 0) {
                 await supabase
                     .from('notifications')
@@ -112,6 +115,39 @@ const Alerts = () => {
         }
     };
 
+    const handleNotificationClick = async (notif: NotificationItem) => {
+        // Mark as read immediately in UI
+        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+
+        // Navigation Logic
+        switch (notif.entity_type) {
+            case 'post':
+                // Assuming we have a route /post/:id or scroll to it
+                // If it's a modal, we might need context logic. For now, assuming page.
+                // Or navigation to home with hash? Let's assume Profile or Home.
+                // Ideally: navigate(`/post/${notif.entity_id}`);
+                // If standard feed: 
+                navigate(`/?postId=${notif.entity_id}`); // Example query param handling, or dedicated route
+                break;
+            case 'profile':
+                navigate(`/profile/${notif.entity_id}`);
+                break;
+            case 'message':
+                navigate(`/chats?chatId=${notif.entity_id}`); // Logic to open specific chat
+                break;
+            case 'community':
+                navigate(`/community/${notif.entity_id}`);
+                break;
+            default:
+                break;
+        }
+
+        // DB update (background)
+        if (!notif.is_read) {
+            await supabase.from('notifications').update({ is_read: true }).eq('id', notif.id);
+        }
+    };
+
     const requestNotificationPermission = async () => {
         if (!("Notification" in window)) {
             toast.error("This browser does not support desktop notifications");
@@ -123,14 +159,9 @@ const Alerts = () => {
             setPermission(result);
             if (result === "granted") {
                 toast.success("Notifications enabled!");
-                new Notification("Notifications Enabled", {
-                    body: "You will now receive updates from your community.",
-                    icon: "/icon.png"
-                });
             }
         } catch (error) {
             console.error(error);
-            toast.error("Failed to enable notifications");
         }
     };
 
@@ -140,18 +171,19 @@ const Alerts = () => {
         const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
         if (diffInSeconds < 60) return "Just now";
-        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-        return `${Math.floor(diffInSeconds / 86400)}d ago`;
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
+        return `${Math.floor(diffInSeconds / 86400)}d`;
     };
 
     const getIcon = (type: string) => {
         switch (type) {
-            case 'follow': return <UserPlus className="h-5 w-5" />;
-            case 'like': return <Heart className="h-5 w-5" />;
-            case 'comment': return <MessageCircle className="h-5 w-5" />;
-            case 'announcement': return <Megaphone className="h-5 w-5" />;
-            default: return <Bell className="h-5 w-5" />;
+            case 'follow': return <UserPlus className="h-4 w-4" />;
+            case 'like': return <Heart className="h-4 w-4 fill-current" />;
+            case 'comment': return <MessageCircle className="h-4 w-4" />;
+            case 'announcement': return <Megaphone className="h-4 w-4" />;
+            case 'message': return <MessageCircle className="h-4 w-4" />;
+            default: return <Bell className="h-4 w-4" />;
         }
     };
 
@@ -162,86 +194,73 @@ const Alerts = () => {
             <main className="mx-auto max-w-xl px-4 py-4">
                 <div className="mb-6 flex items-center justify-between">
                     <h1 className="font-display text-2xl font-bold text-foreground">Notifications</h1>
-                    {permission === "default" && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={requestNotificationPermission}
-                            className="gap-2 text-xs border-border text-foreground hover:bg-muted"
-                        >
-                            <BellRing className="h-3.5 w-3.5" />
-                            Enable Push
-                        </Button>
-                    )}
                 </div>
 
-                <div className="flex flex-col gap-3">
-                    {notifications.length === 0 && !isLoading && (
-                        <div className="text-center py-10 text-muted-foreground">
-                            <Bell className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                            <p>No notifications yet</p>
+                <div className="flex flex-col gap-2">
+                    {isLoading ? (
+                        <div className="text-center py-10 text-muted-foreground animate-pulse">Loading alerts...</div>
+                    ) : notifications.length === 0 ? (
+                        <div className="text-center py-20 text-muted-foreground">
+                            <Bell className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                            <p>No new notifications</p>
+                            <Button variant="link" onClick={requestNotificationPermission}>Enable Push Notifications</Button>
                         </div>
-                    )}
-
-                    <AnimatePresence initial={false} mode="popLayout">
-                        {notifications.map((notification) => {
-                            const isAnnouncement = notification.type === "announcement";
-
-                            return (
-                                <motion.div
-                                    key={notification.id}
-                                    layout
-                                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <TiltCard
-                                        intensity={5}
-                                        className={`group relative flex flex-col gap-3 rounded-xl border p-4 transition-all hover:bg-muted/50 ${isAnnouncement
-                                                ? "bg-primary/5 border-primary/20"
-                                                : notification.is_read
-                                                    ? "bg-card border-border/50"
-                                                    : "bg-muted/30 border-muted"
-                                            }`}
+                    ) : (
+                        <AnimatePresence initial={false} mode="popLayout">
+                            {notifications.map((notification) => {
+                                const isAnnouncement = notification.type === "announcement";
+                                return (
+                                    <motion.div
+                                        key={notification.id}
+                                        layout
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        onClick={() => handleNotificationClick(notification)}
+                                        className="cursor-pointer"
                                     >
-                                        <div className="flex items-start gap-4">
-                                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isAnnouncement ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
-                                                }`}>
-                                                {getIcon(notification.type)}
+                                        <div className={`
+                                            relative flex gap-3 p-4 rounded-xl border transition-all hover:bg-muted/50
+                                            ${!notification.is_read ? 'bg-muted/30 border-primary/20' : 'bg-card border-border/40'}
+                                        `}>
+                                            <div className="shrink-0">
+                                                <Avatar className="h-10 w-10 border border-border/50">
+                                                    <AvatarImage src={notification.sender?.avatar_url} />
+                                                    <AvatarFallback>{notification.sender?.full_name?.[0] || "?"}</AvatarFallback>
+                                                </Avatar>
+                                                <div className={`
+                                                    absolute bottom-3 left-10 -ml-2 flex h-5 w-5 items-center justify-center rounded-full border border-background
+                                                    ${notification.type === 'like' ? 'bg-red-500 text-white' :
+                                                        notification.type === 'follow' ? 'bg-blue-500 text-white' :
+                                                            'bg-primary text-primary-foreground'}
+                                                `}>
+                                                    {getIcon(notification.type)}
+                                                </div>
                                             </div>
 
-                                            <div className="flex-1 space-y-1">
+                                            <div className="flex-1 min-w-0 flex flex-col justify-center">
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-semibold text-foreground">
-                                                            {notification.sender?.full_name || "System"}
-                                                        </span>
-                                                        {isAnnouncement && (
-                                                            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-primary/10 text-primary hover:bg-primary/20">
-                                                                ANNOUNCEMENT
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                                    <p className="text-sm">
+                                                        <span className="font-semibold text-foreground">{notification.sender?.full_name}</span>
+                                                        <span className="text-muted-foreground ml-1">{notification.content.replace(notification.sender?.full_name || '', '')}</span>
+                                                    </p>
+                                                    <span className="text-[10px] text-muted-foreground shrink-0 tabular-nums">
                                                         {formatTime(notification.created_at)}
                                                     </span>
                                                 </div>
-
-                                                <p className="text-sm text-foreground/90 leading-relaxed">
-                                                    {notification.content}
-                                                </p>
                                             </div>
 
-                                            {!notification.is_read && !isAnnouncement && (
-                                                <div className="h-2 w-2 rounded-full bg-primary shrink-0 mt-2" />
+                                            {!notification.is_read && (
+                                                <div className="self-center">
+                                                    <div className="h-2 w-2 rounded-full bg-primary" />
+                                                </div>
                                             )}
                                         </div>
-                                    </TiltCard>
-                                </motion.div>
-                            );
-                        })}
-                    </AnimatePresence>
+                                    </motion.div>
+                                );
+                            })}
+                        </AnimatePresence>
+                    )}
                 </div>
             </main>
 

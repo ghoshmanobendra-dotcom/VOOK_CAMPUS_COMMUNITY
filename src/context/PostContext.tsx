@@ -468,38 +468,7 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                     .insert({ post_id: id, user_id: user.id });
                 if (error) throw error;
             }
-            return; // EXIT EARLY to avoid legacy code
-
-            // Legacy Supabase calls (Optimized for post_likes)
-            if (currentReaction === type) {
-                // Delete
-                const { error } = await supabase.from('likes').delete()
-                    .eq('user_id', user.id)
-                    .eq('post_id', id)
-                    .eq('is_anonymous', isAnonymousMode);
-
-                if (error) throw error;
-                await supabase.rpc('decrement_upvotes', { row_id: id });
-            } else if (currentReaction) {
-                // Update
-                const { error } = await supabase.from('likes').update({ reaction_type: type })
-                    .eq('user_id', user.id)
-                    .eq('post_id', id)
-                    .eq('is_anonymous', isAnonymousMode);
-
-                if (error) throw error;
-            } else {
-                // Insert
-                const { error } = await supabase.from('likes').insert({
-                    user_id: user.id,
-                    post_id: id,
-                    is_anonymous: isAnonymousMode,
-                    reaction_type: type
-                });
-                if (error) throw error;
-                await supabase.rpc('increment_upvotes', { row_id: id });
-            }
-
+            return;
         } catch (error) {
             console.error("Error reacting:", error);
             fetchPosts(); // Revert on error
