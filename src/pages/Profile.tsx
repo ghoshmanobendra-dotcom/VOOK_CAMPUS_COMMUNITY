@@ -25,6 +25,8 @@ import { usePosts } from "@/context/PostContext";
 import FeedPost from "@/components/FeedPost";
 import TiltCard from "@/components/TiltCard";
 import { supabase } from "@/integrations/supabase/client";
+import ProjectCard from "@/components/profile/ProjectCard";
+import AddProjectDialog from "@/components/profile/AddProjectDialog";
 
 // Add this helper function
 const uploadImage = async (file: File) => {
@@ -107,6 +109,30 @@ const Profile = () => {
   // New state to hold files to upload
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
+
+  const [userProjects, setUserProjects] = useState<any[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  const fetchProjects = async () => {
+    if (!profile?.id) return;
+    setLoadingProjects(true);
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('user_id', profile.id)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setUserProjects(data);
+    }
+    setLoadingProjects(false);
+  };
+
+  useEffect(() => {
+    if (profile?.id) {
+      fetchProjects();
+    }
+  }, [profile?.id]);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
@@ -470,11 +496,8 @@ const Profile = () => {
   });
   const savedPosts = posts.filter(p => p.isBookmarked);
 
-  const projects = [
-    { id: 1, title: "Campus Event App", image: featuredImg1, likes: 234 },
-    { id: 2, title: "Study Group Finder", image: featuredImg2, likes: 189 },
-    { id: 3, title: "Podcast Series", image: trendingImg1, likes: 156 },
-  ];
+  // Removed mock projects
+
 
   const achievements = [
     { id: 1, title: "Top Creator", icon: Star, color: "text-foreground" },
@@ -733,24 +756,25 @@ const Profile = () => {
           </TabsContent>
 
           <TabsContent value="projects" className="mt-4">
-            <div className="grid grid-cols-3 gap-2">
-              {projects.map((project) => (
-                <div key={project.id} className="relative aspect-square rounded-lg overflow-hidden group bg-muted">
-                  <img
-                    src={project.image}
-                    alt={project.title}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-10">
+              {isOwnProfile && profile && (
+                <div className="h-full min-h-[250px]">
+                  <AddProjectDialog
+                    userId={profile.id}
+                    onProjectAdded={fetchProjects}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-2">
-                    <div className="text-xs">
-                      <p className="font-medium text-foreground truncate">{project.title}</p>
-                      <p className="text-muted-foreground flex items-center gap-1">
-                        <Heart className="h-3 w-3" /> {project.likes}
-                      </p>
-                    </div>
-                  </div>
+                </div>
+              )}
+              {userProjects.map((project) => (
+                <div key={project.id} className="h-full min-h-[250px]">
+                  <ProjectCard project={project} />
                 </div>
               ))}
+              {!isOwnProfile && userProjects.length === 0 && (
+                <div className="col-span-full h-40 flex items-center justify-center text-muted-foreground bg-muted/20 rounded-lg border border-dashed border-border">
+                  <p>No projects showcased yet.</p>
+                </div>
+              )}
             </div>
           </TabsContent>
 
