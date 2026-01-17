@@ -195,6 +195,9 @@ const CommunityFeedPost = ({ post, onDelete }: CommunityFeedPostProps) => {
                         <div className="flex items-center gap-1 group/reactions relative">
                             {/* Hover Expansion - Pure CSS/Group based for speed */}
                             <div className="absolute bottom-full left-0 mb-2 hidden group-hover/reactions:flex bg-popover border border-border rounded-full p-1 shadow-lg animate-in fade-in slide-in-from-bottom-2 gap-1 z-10">
+                                {/* Invisible Bridge to prevent closing on gap hover */}
+                                <div className="absolute -bottom-4 left-0 w-full h-4 bg-transparent" />
+
                                 {['👍', '❤️', '😂', '😮', '😢', '🙏'].map(emoji => (
                                     <button
                                         key={emoji}
@@ -203,7 +206,7 @@ const CommunityFeedPost = ({ post, onDelete }: CommunityFeedPostProps) => {
                                             reactToPost(post.id, emoji);
                                         }}
                                         className={cn(
-                                            "w-8 h-8 flex items-center justify-center hover:bg-muted rounded-full text-lg transition-transform hover:scale-125",
+                                            "w-8 h-8 flex items-center justify-center hover:bg-muted rounded-full text-lg transition-transform hover:scale-125 relative z-20",
                                             post.userReaction === emoji && "bg-primary/20 scale-110"
                                         )}
                                     >
