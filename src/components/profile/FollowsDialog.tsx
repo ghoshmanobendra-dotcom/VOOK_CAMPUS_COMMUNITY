@@ -32,8 +32,7 @@ const FollowsDialog = ({ userId, username, initialTab = "followers", isOpen, onO
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const navigate = useNavigate();
-
-    // Sync tab when prop changes
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     useEffect(() => {
         if (isOpen) {
             setActiveTab(initialTab);
@@ -51,6 +50,7 @@ const FollowsDialog = ({ userId, username, initialTab = "followers", isOpen, onO
         setLoading(true);
         try {
             const { data: { user: currentUser } } = await supabase.auth.getUser();
+            if (currentUser) setCurrentUserId(currentUser.id);
 
             // 1. Get raw connections
             let rawData;
@@ -222,7 +222,7 @@ const FollowsDialog = ({ userId, username, initialTab = "followers", isOpen, onO
 
                                             {/* Action Button */}
                                             {/* Don't show follow button for self */}
-                                            {user.id !== (supabase.auth.getUser() as any)?.id && (
+                                            {currentUserId && user.id !== currentUserId && (
                                                 <Button
                                                     size="sm"
                                                     variant={user.is_following ? "outline" : "default"}
