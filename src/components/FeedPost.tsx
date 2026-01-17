@@ -60,8 +60,15 @@ interface FeedPostProps {
 
 import { useNavigate } from "react-router-dom";
 
+import CommentSection from "@/components/CommentSection";
+import ShareModal from "@/components/ShareModal";
+import { useState } from "react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+
 const FeedPost = ({ post, onUpvote, onComment, onShare, onBookmark, onClick }: FeedPostProps) => {
   const navigate = useNavigate();
+  const [showComments, setShowComments] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   const handleProfileClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -276,7 +283,8 @@ const FeedPost = ({ post, onUpvote, onComment, onShare, onBookmark, onClick }: F
             className="gap-1.5 px-2 h-8 text-muted-foreground hover:text-primary"
             onClick={(e) => {
               e.stopPropagation();
-              onComment?.(post.id);
+              e.stopPropagation();
+              setShowComments(true);
             }}
           >
             <MessageCircle className="h-4 w-4" />
@@ -304,13 +312,30 @@ const FeedPost = ({ post, onUpvote, onComment, onShare, onBookmark, onClick }: F
             className="h-8 w-8 text-muted-foreground hover:text-primary"
             onClick={(e) => {
               e.stopPropagation();
-              onShare?.(post.id);
+              setShowShare(true);
             }}
           >
             <Share2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      {/* Interactive Modals */}
+      <Dialog open={showComments} onOpenChange={setShowComments}>
+        <DialogContent className="max-w-xl h-[80vh] p-0 gap-0">
+          <CommentSection postId={post.id} onClose={() => setShowComments(false)} />
+        </DialogContent>
+      </Dialog>
+
+      <ShareModal
+        open={showShare}
+        onOpenChange={setShowShare}
+        post={{
+          id: post.id,
+          authorName: post.author.name,
+          content: post.content
+        }}
+      />
     </TiltCard>
   );
 };
