@@ -5,13 +5,20 @@ import { cn } from "@/lib/utils";
 interface Message {
   id: string;
   content: string;
-  type: "text" | "image" | "gif" | "video" | "audio" | "file";
+  type: "text" | "image" | "gif" | "video" | "audio" | "file" | "post";
   sender: "me" | "them";
   timestamp: string;
   status: "sent" | "delivered" | "read";
   reactions?: string[];
   senderName?: string;
   fileName?: string;
+  post?: {
+    id: string;
+    author: string;
+    avatar?: string;
+    content: string;
+    image?: string;
+  };
 }
 
 interface MessageBubbleProps {
@@ -190,6 +197,37 @@ const MessageBubble = ({
                   <span className="text-[10px] opacity-70">Click to open</span>
                 </div>
                 <Download className="h-4 w-4 opacity-50 ml-auto" />
+              </a>
+              <div className={cn("flex items-center gap-1 justify-end px-1 opacity-70 text-[10px]", isMe ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                <span>{message.timestamp}</span>
+                {isMe && <span>{getStatusIcon()}</span>}
+              </div>
+            </div>
+          )}
+
+          {message.type === "post" && message.post && (
+            <div className="flex flex-col gap-1 w-[260px]">
+              <a href={`/post/${message.post.id}`} target="_blank" rel="noopener noreferrer" className="block bg-background/50 rounded-xl overflow-hidden border border-border/50 hover:border-primary/30 transition-colors">
+                {/* Post Header */}
+                <div className="flex items-center gap-2 p-2 border-b border-border/10 bg-muted/20">
+                  <div className="h-6 w-6 rounded-full overflow-hidden bg-muted">
+                    {message.post.avatar && <img src={message.post.avatar} className="w-full h-full object-cover" />}
+                  </div>
+                  <span className="text-xs font-semibold truncate">{message.post.author}</span>
+                  <span className="text-[10px] text-muted-foreground ml-auto bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">Post</span>
+                </div>
+
+                {/* Post Image (if any) */}
+                {message.post.image && (
+                  <div className="w-full h-32 relative">
+                    <img src={message.post.image} className="w-full h-full object-cover" />
+                  </div>
+                )}
+
+                {/* Content Snippet */}
+                <div className="p-3">
+                  <p className="text-sm line-clamp-3 opacity-90">{message.post.content}</p>
+                </div>
               </a>
               <div className={cn("flex items-center gap-1 justify-end px-1 opacity-70 text-[10px]", isMe ? "text-primary-foreground/80" : "text-muted-foreground")}>
                 <span>{message.timestamp}</span>

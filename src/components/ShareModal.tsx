@@ -190,12 +190,14 @@ const ShareModal = ({ open, onOpenChange, post }: ShareModalProps) => {
             }
 
             // Send Message
-            const content = `Check out this post by ${post.authorName}: ${shareUrl}`;
+            // Send Message (Post Share)
+            const content = `Shared a post`; // Fallback text for list view
 
             await supabase.from('messages').insert({
                 chat_id: chatId,
                 sender_id: currentUser.id,
-                content: content
+                content: content,
+                post_id: post.id // Store reference
             });
 
             toast.success("Sent to " + target.name);

@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 export interface Message {
   id: string;
   content: string;
-  type: "text" | "image" | "gif" | "video" | "audio" | "file";
+  type: "text" | "image" | "gif" | "video" | "audio" | "file" | "post";
   sender: "me" | "them";
   timestamp: string;
   status: "sent" | "delivered" | "read";
@@ -41,6 +41,7 @@ export interface Message {
   senderId?: string;
   senderName?: string;
   fileName?: string; // Optional for files
+  post?: any; // For shared posts
 }
 
 interface ChatViewProps {
@@ -144,7 +145,9 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
         .from('messages')
         .select(`
           *,
-          sender_profile:sender_id(full_name, username)
+          *,
+          sender_profile:sender_id(full_name, username),
+          post_details:post_id(id, content, image_urls, video_url, user_id, profiles:user_id(full_name, avatar_url))
         `)
         .eq('chat_id', chat.chatId)
         .order('created_at', { ascending: true });
@@ -159,7 +162,9 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
         let type: Message['type'] = 'text';
         const content = m.content || "";
 
-        if (content.startsWith('http')) {
+        if (m.post_id && m.post_details) {
+          type = 'post';
+        } else if (content.startsWith('http')) {
           if (content.includes('giphy')) type = 'gif';
           else if (content.match(/\.(jpeg|jpg|gif|png|webp)$/i)) type = 'image';
           else if (content.match(/\.(mp4|webm|ogg)$/i)) type = 'video';
@@ -177,7 +182,15 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
           senderName: m.sender_profile?.full_name || m.sender_profile?.username || "Unknown",
           timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           status: m.read_at ? 'read' : 'delivered',
-          reactions: []
+
+          reactions: [],
+          post: m.post_details ? {
+            id: m.post_details.id,
+            author: m.post_details.profiles?.full_name,
+            avatar: m.post_details.profiles?.avatar_url,
+            content: m.post_details.content,
+            image: m.post_details.image_urls?.[0]
+          } : undefined
         };
       });
       setMessages(formatted);
