@@ -1,14 +1,16 @@
-import { useState } from "react";
-import { Users, FileText, Image as ImageIcon, Settings, UserPlus, Link, MoreHorizontal, Calendar, MessageSquare, Volume2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Users, FileText, Image as ImageIcon, Settings, UserPlus, Link, MoreHorizontal, Calendar, MessageSquare, Volume2, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import TiltCard from "@/components/TiltCard";
+import { supabase } from "@/integrations/supabase/client";
 
 import CommunityPostEditor from "./CommunityPostEditor";
 import CommunityFeed from "./CommunityFeed";
+import CommunityAnnouncementsDialog from "./CommunityAnnouncementsDialog";
 
 interface CommunityDetailViewProps {
     community: any;
@@ -22,6 +24,44 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
     const [activeTab, setActiveTab] = useState("posts");
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [editorMode, setEditorMode] = useState<"post" | "announcement">("post");
+    const [isAnnouncementsOpen, setIsAnnouncementsOpen] = useState(false);
+    const [hasNewAnnouncements, setHasNewAnnouncements] = useState(false);
+
+    useEffect(() => {
+        if (community?.id) {
+            checkNewAnnouncements();
+        }
+    }, [community?.id]);
+
+    const checkNewAnnouncements = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('posts')
+                .select('created_at')
+                .eq('community_id', community.id)
+                .eq('is_official', true)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                const latestAnnouncementTime = new Date(data[0].created_at).getTime();
+                const lastSeenTimeStr = localStorage.getItem(`last_seen_announcements_${community.id}`);
+                const lastSeenTime = lastSeenTimeStr ? new Date(lastSeenTimeStr).getTime() : 0;
+
+                if (latestAnnouncementTime > lastSeenTime) {
+                    setHasNewAnnouncements(true);
+                } else {
+                    setHasNewAnnouncements(false);
+                }
+            } else {
+                setHasNewAnnouncements(false);
+            }
+        } catch (error) {
+            console.error("Error checking announcements:", error);
+        }
+    };
 
     return (
         <div className="flex-1 flex flex-col h-full bg-background/50 overflow-hidden relative">
@@ -54,6 +94,28 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                         <UserPlus className="w-4 h-4 mr-2" />
                         Invite
                     </Button>
+
+                    {/* Announcement Button */}
+                    <div className="relative">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-lg relative"
+                            onClick={() => {
+                                setIsAnnouncementsOpen(true);
+                                setHasNewAnnouncements(false);
+                            }}
+                        >
+                            <Megaphone className="h-4 w-4" />
+                        </Button>
+                        {hasNewAnnouncements && (
+                            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span>
+                            </span>
+                        )}
+                    </div>
+
                     <Button variant="ghost" size="icon" className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-lg">
                         <Link className="h-4 w-4" />
                     </Button>
@@ -87,8 +149,6 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                                 Photos
                             </TabsTrigger>
                         </TabsList>
-
-                        {/* Events button REMOVED as per instructions */}
                     </div>
                 </Tabs>
             </div>
@@ -156,7 +216,7 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                                 </div>
                             )}
 
-                            {/* Setup Cards (Only for empty communities/admins - preserved as useful context) */}
+                            {/* Setup Cards */}
                             {groups.length <= 1 && (
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
@@ -170,7 +230,10 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                                             </div>
                                             <span className="font-semibold text-sm">Invite members</span>
                                         </div>
-                                        <div className="bg-card border border-border p-4 rounded-xl flex items-center gap-3 cursor-pointer hover:border-primary/50 transition-colors shadow-sm" onClick={onOpenAnnouncement}>
+                                        <div className="bg-card border border-border p-4 rounded-xl flex items-center gap-3 cursor-pointer hover:border-primary/50 transition-colors shadow-sm" onClick={() => {
+                                            setEditorMode("announcement");
+                                            setIsEditorOpen(true);
+                                        }}>
                                             <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
                                                 <MessageSquare className="w-5 h-5" />
                                             </div>
@@ -208,6 +271,13 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
 
                 </div>
             </ScrollArea>
+
+            <CommunityAnnouncementsDialog
+                communityId={community.id}
+                communityName={community.name}
+                isOpen={isAnnouncementsOpen}
+                onOpenChange={setIsAnnouncementsOpen}
+            />
         </div>
     );
 };

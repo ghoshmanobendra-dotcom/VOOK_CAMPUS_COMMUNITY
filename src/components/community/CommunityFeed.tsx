@@ -29,6 +29,7 @@ const CommunityFeed = ({ communityId, communityName }: CommunityFeedProps) => {
                     profiles:user_id (id, full_name, username, avatar_url, college)
                 `)
                 .eq('community_id', communityId)
+                .eq('is_official', false)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
