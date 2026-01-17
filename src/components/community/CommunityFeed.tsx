@@ -9,9 +9,10 @@ import { FeedPostData } from "@/context/PostContext"; // Reusing type or should 
 interface CommunityFeedProps {
     communityId: string;
     communityName: string;
+    filter?: 'all' | 'official' | 'regular';
 }
 
-const CommunityFeed = ({ communityId, communityName }: CommunityFeedProps) => {
+const CommunityFeed = ({ communityId, communityName, filter = 'regular' }: CommunityFeedProps) => {
     const { currentUser } = usePosts(); // Only need user, not global posts
     const [posts, setPosts] = useState<FeedPostData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -22,15 +23,22 @@ const CommunityFeed = ({ communityId, communityName }: CommunityFeedProps) => {
         try {
             // Fetch posts where community_id equals the community ID
             // Fallback to community_tag if needed handled by migration, here we strictly use ID for new standard
-            const { data: postsData, error } = await supabase
+            let query = supabase
                 .from('posts')
                 .select(`
                     *,
                     profiles:user_id (id, full_name, username, avatar_url, college)
                 `)
                 .eq('community_id', communityId)
-                .eq('is_official', false)
                 .order('created_at', { ascending: false });
+
+            if (filter === 'official') {
+                query = query.eq('is_official', true);
+            } else if (filter === 'regular') {
+                query = query.eq('is_official', false);
+            }
+
+            const { data: postsData, error } = await query;
 
             if (error) throw error;
 
@@ -109,7 +117,7 @@ const CommunityFeed = ({ communityId, communityName }: CommunityFeedProps) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [communityId]);
+    }, [communityId, filter]);
 
     const handleDelete = async (postId: string) => {
         try {
@@ -134,8 +142,8 @@ const CommunityFeed = ({ communityId, communityName }: CommunityFeedProps) => {
         return (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border/50">
                 <Users className="w-10 h-10 mb-3 opacity-20" />
-                <p>No community posts yet.</p>
-                <p className="text-xs">Be the first to start a conversation!</p>
+                <p>No {filter === 'official' ? 'announcements' : 'community posts'} yet.</p>
+                {filter === 'regular' && <p className="text-xs">Be the first to start a conversation!</p>}
             </div>
         );
     }
