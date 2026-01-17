@@ -12,69 +12,24 @@ interface AnnouncementButtonProps {
 const AnnouncementButton = ({ communityId, onToggle, isOpen }: AnnouncementButtonProps) => {
     const [unreadCount, setUnreadCount] = useState(0);
 
-    useEffect(() => {
-        if (!communityId) return;
-        checkUnread();
-
-        const channel = supabase
-            .channel(`announcements_btn:${communityId}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'announcements',
-                    filter: `community_id=eq.${communityId}`
-                },
-                () => {
-                    checkUnread();
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [communityId]);
-
-    const checkUnread = async () => {
-        try {
-            // Get latest announcement
-            const { data: latest } = await supabase
-                .from('announcements')
-                .select('created_at')
-                .eq('community_id', communityId)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
-
-            if (!latest) return;
-
-            // Check against local storage last read
-            const lastRead = localStorage.getItem(`announcements_read_${communityId}`);
-            if (!lastRead || new Date(latest.created_at).getTime() > new Date(lastRead).getTime()) {
-                setUnreadCount(1); // Simple bool check for now, or count real unread if needed
-            } else {
-                setUnreadCount(0);
-            }
-        } catch (e) {
-            console.error(e);
-        }
-    };
+    // Simplified unread check for now - can be expanded to check actual unread posts
+    // For now it pulses/glows as requested in idle state
 
     return (
         <Button
             size="icon"
-            className="h-12 w-12 rounded-full bg-gradient-to-br from-[#667eea] to-[#764ba2] text-white shadow-xl hover:scale-110 transition-all duration-300 relative z-50 border-2 border-white/20"
+            variant="ghost"
+            className={`
+                relative transition-all duration-300
+                ${isOpen ? 'bg-primary/20 scale-110' : 'hover:scale-110 hover:bg-primary/10'}
+                ${!isOpen && 'animate-pulse-slow'} 
+            `}
             onClick={() => onToggle(!isOpen)}
         >
-            <Mic className={`h-6 w-6 ${isOpen ? 'animate-pulse text-red-100' : ''}`} />
+            <Mic className={`h-5 w-5 ${isOpen ? 'text-primary' : 'text-foreground/80'}`} />
 
-            {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 border-2 border-white flex items-center justify-center">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                </span>
-            )}
+            {/* Optional: Glow effect container */}
+            <span className={`absolute inset-0 rounded-full bg-primary/20 blur-md transition-opacity duration-500 ${isOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`} />
         </Button>
     );
 };

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, FileText, Image as ImageIcon, Settings, UserPlus, Link, MoreHorizontal, Calendar, MessageSquare, Volume2, Megaphone } from "lucide-react";
+import { Users, FileText, Image as ImageIcon, Settings, UserPlus, Link, MoreHorizontal, Calendar, MessageSquare, Volume2, Megaphone, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -9,9 +9,8 @@ import TiltCard from "@/components/TiltCard";
 import { supabase } from "@/integrations/supabase/client";
 
 import CommunityPostEditor from "./CommunityPostEditor";
-import CommunityFeed from "./CommunityFeed";
+import MicFeedPanel from "./MicFeedPanel";
 import AnnouncementButton from "./AnnouncementButton";
-import AnnouncementsPanel from "./AnnouncementsPanel";
 
 interface CommunityDetailViewProps {
     community: any;
@@ -60,8 +59,12 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onInvite }: Commu
                         Invite
                     </Button>
 
-                    {/* Old Announcement Button Removed from Header */}
-
+                    {/* Mic Button Switcher - Moved to Header */}
+                    <AnnouncementButton
+                        communityId={community.id}
+                        onToggle={setIsAnnouncementsOpen}
+                        isOpen={isAnnouncementsOpen}
+                    />
 
                     <Button variant="ghost" size="icon" className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-lg">
                         <Link className="h-4 w-4" />
@@ -163,37 +166,34 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onInvite }: Commu
                                 </div>
                             )}
 
-                            {/* Setup Cards */}
+                            {/* Setup Cards - Minimal */}
                             {groups.length <= 1 && (
                                 <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-lg font-bold">Set up your community</h3>
-                                        <p className="text-sm text-muted-foreground">Get started with these quick actions</p>
-                                    </div>
-                                    <div className="grid md:grid-cols-2 gap-4">
-                                        <div className="bg-card border border-border p-4 rounded-xl flex items-center gap-3 cursor-pointer hover:border-primary/50 transition-colors shadow-sm" onClick={onInvite}>
-                                            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
-                                                <UserPlus className="w-5 h-5" />
+                                    <div className="bg-card border border-border p-4 rounded-xl flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                                <Megaphone className="h-5 w-5" />
                                             </div>
-                                            <span className="font-semibold text-sm">Invite members</span>
-                                        </div>
-                                        <div className="bg-card border border-border p-4 rounded-xl flex items-center gap-3 cursor-pointer hover:border-primary/50 transition-colors shadow-sm" onClick={() => {
-                                            setEditorMode("announcement");
-                                            setIsEditorOpen(true);
-                                        }}>
-                                            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
-                                                <MessageSquare className="w-5 h-5" />
+                                            <div>
+                                                <h3 className="font-semibold text-sm">Join the conversation</h3>
+                                                <p className="text-xs text-muted-foreground">Click the mic in the header to view posts</p>
                                             </div>
-                                            <span className="font-semibold text-sm">Create welcome message</span>
                                         </div>
+                                        <Button size="sm" variant="outline" onClick={() => setIsAnnouncementsOpen(true)}>Open Discussion</Button>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Section 2: Posts / Announcements (Feed View) */}
-                            <div className="space-y-4">
-                                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider hidden">Feed</h3>
-                                <CommunityFeed communityId={community.id} communityName={community.name} />
+                            {/* Minimal Placeholder instructions for Feed - BOTTOM FEED REMOVED */}
+                            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground border-2 border-dashed border-muted rounded-xl bg-muted/20">
+                                <MessageSquare className="w-12 h-12 mb-4 opacity-20" />
+                                <h3 className="text-lg font-medium text-foreground/80">Discussions are in the side panel</h3>
+                                <p className="text-sm max-w-xs text-center mt-2">
+                                    Click the <span className="inline-flex items-center justify-center p-1 bg-background rounded-full shadow-sm mx-1 align-middle"><Volume2 className="w-3 h-3 text-primary" /></span> icon in the header to view conversations.
+                                </p>
+                                <Button className="mt-6" variant="secondary" onClick={() => setIsAnnouncementsOpen(true)}>
+                                    Open Discussion Panel
+                                </Button>
                             </div>
                         </div>
                     )}
@@ -219,17 +219,10 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onInvite }: Commu
                 </div>
             </ScrollArea>
 
-            {/* Floating Announcement Button */}
-            <div className="fixed bottom-6 right-6 z-40">
-                <AnnouncementButton
-                    communityId={community.id}
-                    onToggle={setIsAnnouncementsOpen}
-                    isOpen={isAnnouncementsOpen}
-                />
-            </div>
-
-            <AnnouncementsPanel
+            {/* Mic Feed Panel (Overlay) */}
+            <MicFeedPanel
                 communityId={community.id}
+                communityName={community.name}
                 isOpen={isAnnouncementsOpen}
                 onClose={() => setIsAnnouncementsOpen(false)}
             />
