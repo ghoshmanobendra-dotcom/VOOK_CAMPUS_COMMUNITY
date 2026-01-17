@@ -446,16 +446,29 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
             // Supabase calls
             if (currentReaction === type) {
                 // Delete
-                const { error } = await supabase.from('likes').delete().match({ user_id: user.id, post_id: id, is_anonymous: isAnonymousMode });
+                const { error } = await supabase.from('likes').delete()
+                    .eq('user_id', user.id)
+                    .eq('post_id', id)
+                    .eq('is_anonymous', isAnonymousMode);
+
                 if (error) throw error;
                 await supabase.rpc('decrement_upvotes', { row_id: id });
             } else if (currentReaction) {
                 // Update
-                const { error } = await supabase.from('likes').update({ reaction_type: type }).match({ user_id: user.id, post_id: id, is_anonymous: isAnonymousMode });
+                const { error } = await supabase.from('likes').update({ reaction_type: type })
+                    .eq('user_id', user.id)
+                    .eq('post_id', id)
+                    .eq('is_anonymous', isAnonymousMode);
+
                 if (error) throw error;
             } else {
                 // Insert
-                const { error } = await supabase.from('likes').insert({ user_id: user.id, post_id: id, is_anonymous: isAnonymousMode, reaction_type: type });
+                const { error } = await supabase.from('likes').insert({
+                    user_id: user.id,
+                    post_id: id,
+                    is_anonymous: isAnonymousMode,
+                    reaction_type: type
+                });
                 if (error) throw error;
                 await supabase.rpc('increment_upvotes', { row_id: id });
             }
@@ -485,9 +498,16 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
             setPosts(prev => prev.map(p => p.id === id ? { ...p, isBookmarked: !isBookmarked } : p));
 
             if (isBookmarked) {
-                await supabase.from('bookmarks').delete().match({ user_id: user.id, post_id: id, is_anonymous: isAnonymousMode });
+                await supabase.from('bookmarks').delete()
+                    .eq('user_id', user.id)
+                    .eq('post_id', id)
+                    .eq('is_anonymous', isAnonymousMode);
             } else {
-                await supabase.from('bookmarks').insert({ user_id: user.id, post_id: id, is_anonymous: isAnonymousMode });
+                await supabase.from('bookmarks').insert({
+                    user_id: user.id,
+                    post_id: id,
+                    is_anonymous: isAnonymousMode
+                });
             }
         } catch (error) {
             console.error("Error toggling bookmark:", error);
