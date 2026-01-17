@@ -217,7 +217,7 @@ const Profile = () => {
                   setIsFollowing(state.preCheckFollow);
                 } else {
                   console.log("Fetching fresh follow status from DB");
-                  const { count, error } = await supabase.from('follows').select('id', { count: 'exact', head: true })
+                  const { count, error } = await supabase.from('follows').select('*', { count: 'exact', head: true })
                     .eq('follower_id', user.id)
                     .eq('following_id', profileData.id);
 
