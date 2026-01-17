@@ -24,7 +24,7 @@ interface CommunityFeedPostProps {
 }
 
 const CommunityFeedPost = ({ post, onDelete }: CommunityFeedPostProps) => {
-    const { currentUser, toggleUpvote, toggleBookmark } = usePosts();
+    const { currentUser, toggleUpvote, toggleBookmark, reactToPost } = usePosts();
     const [isReplying, setIsReplying] = useState(false);
     const [isViewingConversation, setIsViewingConversation] = useState(false);
     const [replyContent, setReplyContent] = useState("");
@@ -198,8 +198,14 @@ const CommunityFeedPost = ({ post, onDelete }: CommunityFeedPostProps) => {
                                 {['👍', '❤️', '😂', '😮', '😢', '🙏'].map(emoji => (
                                     <button
                                         key={emoji}
-                                        onClick={() => toggleUpvote(post.id)}
-                                        className="w-8 h-8 flex items-center justify-center hover:bg-muted rounded-full text-lg transition-transform hover:scale-110"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            reactToPost(post.id, emoji);
+                                        }}
+                                        className={cn(
+                                            "w-8 h-8 flex items-center justify-center hover:bg-muted rounded-full text-lg transition-transform hover:scale-125",
+                                            post.userReaction === emoji && "bg-primary/20 scale-110"
+                                        )}
                                     >
                                         {emoji}
                                     </button>
@@ -209,10 +215,17 @@ const CommunityFeedPost = ({ post, onDelete }: CommunityFeedPostProps) => {
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className={cn("h-8 gap-1.5 px-2 text-muted-foreground hover:bg-muted/50", post.isUpvoted && "text-blue-500 bg-blue-500/10")}
+                                className={cn(
+                                    "h-8 gap-1.5 px-2 text-muted-foreground hover:bg-muted/50 transition-colors",
+                                    post.isUpvoted && "text-blue-500 bg-blue-500/10"
+                                )}
                                 onClick={() => toggleUpvote(post.id)}
                             >
-                                <ArrowUp className={cn("w-4 h-4", post.isUpvoted && "fill-current")} />
+                                {post.userReaction ? (
+                                    <span className="text-base leading-none">{post.userReaction}</span>
+                                ) : (
+                                    <ArrowUp className={cn("w-4 h-4", post.isUpvoted && "fill-current")} />
+                                )}
                                 <span className="text-xs font-medium">{post.upvotes > 0 ? post.upvotes : 'Like'}</span>
                             </Button>
                         </div>

@@ -32,6 +32,7 @@ export interface FeedPostData {
     upvotes: number;
     comments: number;
     isUpvoted?: boolean;
+    userReaction?: string;
     isBookmarked?: boolean;
     previewComments?: PostComment[];
     poll?: {
@@ -50,11 +51,11 @@ export interface FeedPostData {
 }
 
 interface PostContextType {
-    // ... (rest of interface remains same)
     posts: FeedPostData[];
     fetchPosts: (filter?: string) => Promise<void>;
     addPost: (post: Omit<FeedPostData, "id" | "timestamp" | "upvotes" | "comments">) => Promise<boolean>;
     toggleUpvote: (id: string) => Promise<void>;
+    reactToPost: (id: string, type: string) => Promise<void>;
     toggleBookmark: (id: string) => Promise<void>;
     currentUser: {
         name: string;
@@ -80,7 +81,6 @@ interface PostContextType {
 const PostContext = createContext<PostContextType | undefined>(undefined);
 
 export const PostProvider = ({ children }: { children: ReactNode }) => {
-    // ... (state and fetchUserProfile remain same)
     const [posts, setPosts] = useState<FeedPostData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isAnonymousMode, setIsAnonymousMode] = useState(false);
@@ -115,9 +115,7 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                         id: user.id
                     });
                 } else {
-                    // Create profile if it doesn't exist (First time OAuth)
                     const meta = user.user_metadata;
-                    // Robust check for name and avatar from various providers
                     const fullName = meta.full_name || meta.name || meta.user_name || "New User";
                     const avatarUrl = meta.avatar_url || meta.picture || meta.avatar || "";
 
@@ -142,8 +140,6 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                             college: "Campus",
                             id: user.id
                         });
-                    } else {
-                        console.error("Profile creation failed:", insertError);
                     }
                 }
             }
@@ -152,9 +148,7 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    // Updated fetchPosts with Filter Support
     const fetchPosts = async (filter: string = "all") => {
-        console.log("fetchPosts called with filter:", filter);
         try {
             setIsLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
@@ -167,55 +161,34 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                 `)
                 .order('created_at', { ascending: false });
 
-            // Apply Filter Logic
             if (filter === "campus") {
                 query = query.eq('visibility', 'campus');
-                // RLS enforces campus_id match, so we just ask for 'campus' type
             } else if (filter === "followers") {
                 query = query.eq('visibility', 'followers');
             } else if (filter === "all") {
-                // "Home" feed: Public posts OR "Campus Only" is hidden? 
-                // Prompts says: "Campus-Only posts ... Never appear in Home"
-                // So default/all = public only.
                 query = query.eq('visibility', 'public');
-            }
-            // "trending" usually implies public/all sorted, handled by sort or same as 'all' for now.
-            else if (filter === "trending") {
+            } else if (filter === "trending") {
                 query = query.eq('visibility', 'public');
             }
 
-            // Only fetch PERSONAL posts for the main feed/profile context (unless specific later)
-            // Actually, fetchPosts feeds 'usePosts' which is global.
-            // If we filter 'personal' here, community posts won't show in Context.
-            // But Community pages fetch their own posts separately usually?
-            // User Prompt says: "Community posts → Only visible in community feed"
-            // So global feed (Home) should NOT contain community posts.
-            // AND Profile feed (which uses this context) should NOT contain community posts.
-
-            // Therefore, we enforce post_type = 'personal' globally here,
-            // UNLESS we are specifically asking for community posts (which usually happens via a different function, but let's be safe).
-            // Actually, if we filter here, we don't need to filter in Profile.tsx, but Profile.tsx filters 'posts' from context.
-
-            // Let's exclude community posts from this GLOBAL fetch.
             query = query.is('community_id', null);
 
             const { data: postsData, error } = await query;
-
-            console.log("postsData length:", postsData?.length, "error:", error);
             if (error) throw error;
 
-            // Fetch likes and bookmarks for current user (filtered by current mode)
-            let userLikes: string[] = [];
+            let userLikesMap = new Map<string, string>(); // postId -> reaction_type
             let userBookmarks: string[] = [];
 
             if (user) {
                 const { data: likesResult } = await supabase
                     .from('likes')
-                    .select('post_id')
+                    .select('post_id, reaction_type')
                     .eq('user_id', user.id)
                     .eq('is_anonymous', isAnonymousMode);
 
-                if (likesResult) userLikes = likesResult.map(l => l.post_id);
+                if (likesResult) {
+                    likesResult.forEach(l => userLikesMap.set(l.post_id, l.reaction_type || 'like'));
+                }
 
                 const { data: bookmarksResult } = await supabase
                     .from('bookmarks')
@@ -228,7 +201,6 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
 
             const formattedPosts: FeedPostData[] = (postsData || []).map(p => {
                 const isAnon = p.is_anonymous;
-                // ... mapping logic remains same ...
                 const isOwnPost = user && user.id === p.user_id;
 
                 return {
@@ -258,9 +230,9 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                     videoThumbnail: undefined,
                     upvotes: p.upvotes || 0,
                     comments: p.comments_count || 0,
-                    isUpvoted: userLikes.includes(p.id),
+                    isUpvoted: userLikesMap.has(p.id),
+                    userReaction: userLikesMap.get(p.id),
                     isBookmarked: userBookmarks.includes(p.id),
-
                     previewComments: [],
                     postType: p.post_type || (p.community_id ? 'community' : 'personal'),
                     communityId: p.community_id
@@ -275,7 +247,6 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    // Re-fetch posts when mode changes to update like status
     useEffect(() => {
         fetchPosts();
     }, [isAnonymousMode]);
@@ -298,21 +269,17 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
     const fetchUnreadMessageCount = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-
-        // 1. Get my chats
         const { data: myChats } = await supabase
             .from('chat_participants')
             .select('chat_id')
             .eq('user_id', user.id);
 
         const chatIds = myChats?.map(c => c.chat_id) || [];
-
         if (chatIds.length === 0) {
             setUnreadMessages(0);
             return;
         }
 
-        // 2. Count unread messages in those chats
         let query = supabase
             .from('messages')
             .select('*', { count: 'exact', head: true })
@@ -320,14 +287,12 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
             .neq('sender_id', user.id)
             .is('read_at', null);
 
-        // Filter by last check time to support clearing badge locally
         const lastCheck = localStorage.getItem('lastChatCheck');
         if (lastCheck) {
             query = query.gt('created_at', lastCheck);
         }
 
         const { count } = await query;
-
         setUnreadMessages(count || 0);
     };
 
@@ -341,7 +306,6 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
     };
 
     useEffect(() => {
-        // Initial fetch
         fetchUserProfile();
         fetchPosts();
         fetchUnreadCount();
@@ -350,31 +314,21 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
         const postsChannel = supabase
             .channel('public:posts')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
-                console.log("Real-time post change detected, fetching posts");
                 fetchPosts();
             })
             .subscribe();
 
         const notifChannel = supabase
             .channel('public:notifications_global')
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'notifications',
-                },
-                async (payload) => {
-                    const newNotif = payload.new as any;
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (user && newNotif.recipient_id === user.id) {
-                        setUnreadCount(prev => prev + 1);
-                    }
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, async (payload) => {
+                const newNotif = payload.new as any;
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user && newNotif.recipient_id === user.id) {
+                    setUnreadCount(prev => prev + 1);
                 }
-            )
+            })
             .subscribe();
 
-        // Auth Listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN') {
                 await fetchUserProfile();
@@ -382,15 +336,9 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                 fetchUnreadCount();
                 fetchUnreadMessageCount();
             } else if (event === 'SIGNED_OUT') {
-                setCurrentUser({
-                    name: "Guest",
-                    username: "@guest",
-                    initials: "G",
-                    college: "Campus",
-                    avatar: undefined
-                });
+                setCurrentUser({ name: "Guest", username: "@guest", initials: "G", college: "Campus", avatar: undefined });
                 setIsAnonymousMode(false);
-                setPosts([]); // Optional: clear posts or keep generic ones
+                setPosts([]);
             }
         });
 
@@ -401,18 +349,13 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
         };
     }, []);
 
-    // Separate channel for messages to keep logic clean? Or combine?
-    // Let's make a dedicated useEffect for message counting since it relies on auth heavily for chat_id list
-    // Actually the above main subscriptions are fine, but for messages `postgres_changes` on 'messages' table is good.
     useEffect(() => {
         const channel = supabase
             .channel('global_unread_messages')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-                // Brute force refresh for accuracy
                 fetchUnreadMessageCount();
             })
             .subscribe();
-
         return () => { supabase.removeChannel(channel); };
     }, []);
 
@@ -427,14 +370,13 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                 toast.error("You must be logged in to post");
                 return false;
             }
-
             const postPayload = {
                 user_id: user.id,
                 content: newPostData.content,
                 image_urls: newPostData.images || [],
                 community_tag: newPostData.communityTag,
                 community_id: newPostData.communityId,
-                post_type: newPostData.postType || 'personal', // Explicitly pass type
+                post_type: newPostData.postType || 'personal',
                 is_official: false,
                 is_anonymous: isAnonymousMode,
                 created_at: new Date().toISOString(),
@@ -442,70 +384,91 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                 comments_count: 0
             };
 
-            const { error } = await supabase
-                .from('posts')
-                .insert(postPayload);
-
-            console.log("Insert post error:", error);
+            const { error } = await supabase.from('posts').insert(postPayload);
             if (error) throw error;
 
-            // Refresh posts ONLY if it's a home/personal post
-            // If it's a community post, we don't need to refresh the global feed
-            const isHomePost = !newPostData.communityTag ||
-                newPostData.communityTag === "Campus Only" ||
-                newPostData.communityTag === "Followers only";
-
-            console.log("Post inserted. isHomePost:", isHomePost);
-
+            const isHomePost = !newPostData.communityTag || newPostData.communityTag === "Campus Only" || newPostData.communityTag === "Followers only";
             if (isHomePost) {
                 await fetchPosts();
             }
             return true;
-
         } catch (error: any) {
-            console.error("Error creating post:", error);
             toast.error("Failed to create post: " + error.message);
             return false;
         }
     };
 
-    const toggleUpvote = async (id: string) => {
+    const reactToPost = async (id: string, type: string) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
-                toast.error("Please login to like posts");
+                toast.error("Please login to react");
                 return;
             }
 
             const postIndex = posts.findIndex(p => p.id === id);
             if (postIndex === -1) return;
             const post = posts[postIndex];
-            const isCurrentlyUpvoted = post.isUpvoted;
+            const currentReaction = post.userReaction;
 
             // Optimistic Update
-            setPosts(prev => prev.map(p =>
-                p.id === id
-                    ? { ...p, isUpvoted: !isCurrentlyUpvoted, upvotes: p.upvotes + (isCurrentlyUpvoted ? -1 : 1) }
-                    : p
-            ));
+            let newPosts = [...posts];
 
-            if (isCurrentlyUpvoted) {
+            if (currentReaction === type) {
+                // Toggle OFF
+                newPosts[postIndex] = {
+                    ...post,
+                    isUpvoted: false,
+                    userReaction: undefined,
+                    upvotes: Math.max(0, post.upvotes - 1)
+                };
+            } else {
+                // Change or Add
+                if (currentReaction) {
+                    // Changing reaction (no vote count change)
+                    newPosts[postIndex] = {
+                        ...post,
+                        isUpvoted: true,
+                        userReaction: type
+                    };
+                } else {
+                    // New reaction
+                    newPosts[postIndex] = {
+                        ...post,
+                        isUpvoted: true,
+                        userReaction: type,
+                        upvotes: post.upvotes + 1
+                    };
+                }
+            }
+            setPosts(newPosts);
+
+            // Supabase calls
+            if (currentReaction === type) {
+                // Delete
                 const { error } = await supabase.from('likes').delete().match({ user_id: user.id, post_id: id, is_anonymous: isAnonymousMode });
                 if (error) throw error;
-
-                const { error: decError } = await supabase.rpc('decrement_upvotes', { row_id: id });
-                if (decError) console.error(decError);
-            } else {
-                const { error } = await supabase.from('likes').insert({ user_id: user.id, post_id: id, is_anonymous: isAnonymousMode });
+                await supabase.rpc('decrement_upvotes', { row_id: id });
+            } else if (currentReaction) {
+                // Update
+                const { error } = await supabase.from('likes').update({ reaction_type: type }).match({ user_id: user.id, post_id: id, is_anonymous: isAnonymousMode });
                 if (error) throw error;
-
-                const { error: incError } = await supabase.rpc('increment_upvotes', { row_id: id });
-                if (incError) console.error(incError);
+            } else {
+                // Insert
+                const { error } = await supabase.from('likes').insert({ user_id: user.id, post_id: id, is_anonymous: isAnonymousMode, reaction_type: type });
+                if (error) throw error;
+                await supabase.rpc('increment_upvotes', { row_id: id });
             }
+
         } catch (error) {
-            console.error("Error toggling vote:", error);
-            fetchPosts();
+            console.error("Error reacting:", error);
+            fetchPosts(); // Revert on error
         }
+    };
+
+    const toggleUpvote = async (id: string) => {
+        // Alias for default like
+        await reactToPost(id, '👍');
     };
 
     const toggleBookmark = async (id: string) => {
@@ -515,16 +478,11 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                 toast.error("Please login to bookmark posts");
                 return;
             }
-
             const postIndex = posts.findIndex(p => p.id === id);
             if (postIndex === -1) return;
             const isBookmarked = posts[postIndex].isBookmarked;
 
-            setPosts(prev => prev.map(p =>
-                p.id === id
-                    ? { ...p, isBookmarked: !isBookmarked }
-                    : p
-            ));
+            setPosts(prev => prev.map(p => p.id === id ? { ...p, isBookmarked: !isBookmarked } : p));
 
             if (isBookmarked) {
                 await supabase.from('bookmarks').delete().match({ user_id: user.id, post_id: id, is_anonymous: isAnonymousMode });
@@ -543,6 +501,7 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                 fetchPosts,
                 addPost,
                 toggleUpvote,
+                reactToPost,
                 toggleBookmark,
                 currentUser: isAnonymousMode ? {
                     name: "Anonymous User",
@@ -550,7 +509,7 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                     avatar: undefined,
                     initials: "?",
                     college: "Hidden",
-                    id: currentUser.id // Keep existing ID for logic
+                    id: currentUser.id
                 } : currentUser,
                 isAnonymousMode,
                 toggleAnonymousMode,
