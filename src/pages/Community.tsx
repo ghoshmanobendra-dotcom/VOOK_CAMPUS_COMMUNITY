@@ -161,7 +161,8 @@ const Community = () => {
         .from('chats')
         .select('*')
         .in('id', adminChatIds)
-        .eq('type', 'group');
+        .eq('type', 'group')
+        .eq('is_announcement', false);
 
       if (chatsError) throw chatsError;
 
