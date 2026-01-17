@@ -45,6 +45,20 @@ const GlobalChatListener = () => {
                     // But let's check how we access it.
                     if (newMessage.chat_id === activeChatIdRef.current) return;
 
+                    // Add delay to allow read status to propagate (e.g. if open on another device)
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    // Verify if message is already read by current user
+                    const { data: isRead } = await supabase.rpc('is_message_read', {
+                        p_message_id: newMessage.id,
+                        p_user_id: currentUser.id
+                    });
+
+                    if (isRead) {
+                        console.log("Suppressing notification: Message already read.");
+                        return;
+                    }
+
                     // Fetch sender details
                     const { data: senderData } = await supabase
                         .from('profiles')

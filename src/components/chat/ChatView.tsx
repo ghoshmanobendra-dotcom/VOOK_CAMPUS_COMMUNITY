@@ -187,12 +187,11 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
         .filter((m: any) => m.sender_id !== currentUser?.id && !m.read_at)
         .map((m: any) => m.id);
 
-      if (unreadIds.length > 0) {
-        await supabase
-          .from('messages')
-          .update({ read_at: new Date().toISOString() })
-          .in('id', unreadIds);
-
+      if (unreadIds.length > 0 && currentUser?.id) {
+        await supabase.rpc('mark_messages_read_batch', {
+          p_message_ids: unreadIds,
+          p_user_id: currentUser.id
+        });
         refreshUnreadMessages();
       }
     };
@@ -241,7 +240,10 @@ const ChatView = ({ chat, onBack, className }: ChatViewProps) => {
 
         if (newMsg.sender_id !== currentUser?.id) {
           try {
-            await supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', newMsg.id);
+            await supabase.rpc('mark_message_read', {
+              p_message_id: newMsg.id,
+              p_user_id: currentUser!.id
+            });
             refreshUnreadMessages();
           } catch (e) { console.error(e); }
         }
