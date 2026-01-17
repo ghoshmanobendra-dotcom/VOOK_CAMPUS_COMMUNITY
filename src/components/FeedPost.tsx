@@ -62,6 +62,7 @@ import { useNavigate } from "react-router-dom";
 
 import CommentSection from "@/components/CommentSection";
 import ShareModal from "@/components/ShareModal";
+import PostLikesDisplay from "@/components/PostLikesDisplay";
 import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
@@ -258,6 +259,15 @@ const FeedPost = ({ post, onUpvote, onComment, onShare, onBookmark, onClick }: F
           )}
         </div>
       )}
+
+      {/* Mutual Likes Summary */}
+      <div className="px-1 mb-2">
+        <PostLikesDisplay
+          postId={post.id}
+          initialCount={post.upvotes}
+          initialIsLiked={!!post.isUpvoted}
+        />
+      </div>
 
       {/* Engagement Actions */}
       <div className="flex items-center justify-between pt-3 border-t border-border">
