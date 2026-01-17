@@ -52,6 +52,7 @@ const CommentSection = ({ postId, onClose }: CommentSectionProps) => {
                     author:user_id (full_name, username, avatar_url)
                 `)
                 .eq('post_id', postId)
+                .eq('is_active', true) // Filter soft deleted
                 .order('created_at', { ascending: true });
 
             if (error) throw error;
@@ -83,7 +84,19 @@ const CommentSection = ({ postId, onClose }: CommentSectionProps) => {
     };
 
     const handleSubmit = async () => {
-        if (!newComment.trim() || !currentUser?.id) return;
+        if (!newComment.trim()) return;
+
+        // Ensure we have a valid user ID (fallback to auth if context is masked)
+        let userId = currentUser?.id;
+        if (!userId) {
+            const { data: { user } } = await supabase.auth.getUser();
+            userId = user?.id;
+        }
+
+        if (!userId) {
+            toast.error("You must be logged in to comment");
+            return;
+        }
 
         const content = newComment;
         setNewComment("");
@@ -96,12 +109,12 @@ const CommentSection = ({ postId, onClose }: CommentSectionProps) => {
             id: tempId,
             content,
             created_at: new Date().toISOString(),
-            user_id: currentUser.id,
+            user_id: userId,
             parent_id: replyingTo?.id || null,
-            author: {
-                full_name: currentUser.name,
-                username: currentUser.username,
-                avatar_url: currentUser.avatar
+            author: { // Use context name or fallback
+                full_name: currentUser?.name || "You",
+                username: currentUser?.username || "@you",
+                avatar_url: currentUser?.avatar
             },
             replies: []
         };
@@ -111,7 +124,6 @@ const CommentSection = ({ postId, onClose }: CommentSectionProps) => {
                 if (c.id === replyingTo.id) {
                     return { ...c, replies: [...(c.replies || []), optimisticComment] };
                 }
-                // Deep search if needed, but for now 1-level deep UI usually
                 return c;
             }));
         } else {
@@ -123,9 +135,10 @@ const CommentSection = ({ postId, onClose }: CommentSectionProps) => {
                 .from('comments')
                 .insert({
                     post_id: postId,
-                    user_id: currentUser.id,
+                    user_id: userId,
                     content,
-                    parent_id: replyingTo?.id || null
+                    parent_id: replyingTo?.id || null,
+                    is_active: true // Explicitly set active
                 })
                 .select(`
                     *,
@@ -133,7 +146,10 @@ const CommentSection = ({ postId, onClose }: CommentSectionProps) => {
                 `)
                 .single();
 
-            if (error) throw error;
+            if (error) {
+                console.error("Comment insert error:", error);
+                throw error;
+            }
 
             // Replace temp with real
             if (replyingTo) {
@@ -147,9 +163,10 @@ const CommentSection = ({ postId, onClose }: CommentSectionProps) => {
                 setComments(prev => prev.map(c => c.id === tempId ? data : c));
             }
 
-        } catch (err) {
-            toast.error("Failed to post comment");
-            // Revert changes (simplified)
+        } catch (err: any) {
+            console.error("Failed to post comment:", err);
+            toast.error("Failed to post: " + (err.message || "Unknown error"));
+            // Revert changes
             fetchComments();
         }
     };

@@ -549,7 +549,8 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                     username: "@anonymous",
                     avatar: undefined,
                     initials: "?",
-                    college: "Hidden"
+                    college: "Hidden",
+                    id: currentUser.id // Keep existing ID for logic
                 } : currentUser,
                 isAnonymousMode,
                 toggleAnonymousMode,
