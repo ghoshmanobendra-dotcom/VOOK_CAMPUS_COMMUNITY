@@ -433,7 +433,8 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                 content: newPostData.content,
                 image_urls: newPostData.images || [],
                 community_tag: newPostData.communityTag,
-                community_id: newPostData.communityId, // <--- Add this
+                community_id: newPostData.communityId,
+                post_type: newPostData.postType || 'personal', // Explicitly pass type
                 is_official: false,
                 is_anonymous: isAnonymousMode,
                 created_at: new Date().toISOString(),
