@@ -27,6 +27,7 @@ import TiltCard from "@/components/TiltCard";
 import { supabase } from "@/integrations/supabase/client";
 import ProjectCard from "@/components/profile/ProjectCard";
 import AddProjectDialog from "@/components/profile/AddProjectDialog";
+import FollowsDialog from "@/components/profile/FollowsDialog";
 
 // Add this helper function
 const uploadImage = async (file: File) => {
@@ -56,6 +57,8 @@ const Profile = () => {
 
   // Initialize from navigation state if available
   const [profile, setProfile] = useState<any>(state?.profile || null);
+  const [isFollowsDialogOpen, setIsFollowsDialogOpen] = useState(false);
+  const [followsDialogTab, setFollowsDialogTab] = useState<"followers" | "following">("followers");
 
   // Single Source of Truth Logic:
   // We NEVER trust navigation state for follow status. We always fetch from DB to ensure accuracy.
@@ -699,22 +702,49 @@ const Profile = () => {
           </div>
         )}
 
+
         {/* Stats Row */}
         <div className="mt-4 flex gap-6">
           <div className="text-center">
             <p className="text-xl font-bold text-foreground">{stats.posts}</p>
             <p className="text-xs text-muted-foreground">Posts</p>
           </div>
-          <div className="text-center">
+          <div
+            className="text-center cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => {
+              setFollowsDialogTab("followers");
+              setIsFollowsDialogOpen(true);
+            }}
+          >
             <p className="text-xl font-bold text-foreground">{stats.followers}</p>
             <p className="text-xs text-muted-foreground">Followers</p>
           </div>
-          <div className="text-center">
+          <div
+            className="text-center cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => {
+              setFollowsDialogTab("following");
+              setIsFollowsDialogOpen(true);
+            }}
+          >
             <p className="text-xl font-bold text-foreground">{stats.following}</p>
             <p className="text-xs text-muted-foreground">Following</p>
           </div>
         </div>
       </div>
+
+      {/* ... tabs content ... */}
+
+      {/* Dialogs */}
+      {profile && (
+        <FollowsDialog
+          isOpen={isFollowsDialogOpen}
+          onOpenChange={setIsFollowsDialogOpen}
+          userId={profile.id}
+          username={profile.username}
+          initialTab={followsDialogTab}
+        />
+      )}
+
 
       {/* Tabs Navigation */}
       <div className="px-4 mt-6">
