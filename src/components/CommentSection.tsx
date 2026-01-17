@@ -46,13 +46,12 @@ const CommentSection = ({ postId, onClose }: CommentSectionProps) => {
     const fetchComments = async () => {
         try {
             const { data, error } = await supabase
-                .from('comments')
+                .from('post_comments')
                 .select(`
                     *,
                     author:user_id (full_name, username, avatar_url)
                 `)
                 .eq('post_id', postId)
-                .eq('is_active', true) // Filter soft deleted
                 .order('created_at', { ascending: true });
 
             if (error) throw error;
@@ -132,13 +131,12 @@ const CommentSection = ({ postId, onClose }: CommentSectionProps) => {
 
         try {
             const { data, error } = await supabase
-                .from('comments')
+                .from('post_comments')
                 .insert({
                     post_id: postId,
                     user_id: userId,
                     content,
-                    parent_id: replyingTo?.id || null,
-                    is_active: true // Explicitly set active
+                    parent_id: replyingTo?.id || null
                 })
                 .select(`
                     *,
@@ -173,7 +171,7 @@ const CommentSection = ({ postId, onClose }: CommentSectionProps) => {
 
     const handleDelete = async (commentId: string) => {
         try {
-            await supabase.from('comments').delete().eq('id', commentId);
+            await supabase.from('post_comments').delete().eq('id', commentId);
             toast.success("Comment deleted");
             fetchComments();
         } catch (e) {

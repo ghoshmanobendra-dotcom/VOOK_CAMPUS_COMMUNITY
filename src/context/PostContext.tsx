@@ -157,7 +157,9 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                 .from('posts')
                 .select(`
                     *,
-                    profiles:user_id (id, full_name, username, avatar_url, college)
+                    profiles:user_id (id, full_name, username, avatar_url, college),
+                    post_likes!left(count),
+                    post_comments!left(count)
                 `)
                 .order('created_at', { ascending: false });
 
@@ -176,32 +178,34 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
             const { data: postsData, error } = await query;
             if (error) throw error;
 
-            let userLikesMap = new Map<string, string>(); // postId -> reaction_type
-            let userBookmarks: string[] = [];
-
+            // Get User's Likes (My Likes) using post_likes table
+            const myLikedPostIds = new Set<string>();
             if (user) {
-                const { data: likesResult } = await supabase
-                    .from('likes')
-                    .select('post_id, reaction_type')
-                    .eq('user_id', user.id)
-                    .eq('is_anonymous', isAnonymousMode);
+                const { data: myLikes } = await supabase
+                    .from('post_likes')
+                    .select('post_id')
+                    .eq('user_id', user.id);
 
-                if (likesResult) {
-                    likesResult.forEach(l => userLikesMap.set(l.post_id, l.reaction_type || 'like'));
-                }
+                myLikes?.forEach(l => myLikedPostIds.add(l.post_id));
+            }
 
+            // Bookmarks (legacy logic kept for now)
+            let userBookmarks: string[] = [];
+            if (user) {
                 const { data: bookmarksResult } = await supabase
                     .from('bookmarks')
                     .select('post_id')
-                    .eq('user_id', user.id)
-                    .eq('is_anonymous', isAnonymousMode);
-
+                    .eq('user_id', user.id);
                 if (bookmarksResult) userBookmarks = bookmarksResult.map(b => b.post_id);
             }
+
 
             const formattedPosts: FeedPostData[] = (postsData || []).map(p => {
                 const isAnon = p.is_anonymous;
                 const isOwnPost = user && user.id === p.user_id;
+                // Supabase returns count as [{ count: n }] or similar depending on query
+                const likeCount = p.post_likes?.[0]?.count || 0;
+                const commentCount = p.post_comments?.[0]?.count || 0;
 
                 return {
                     id: p.id,
@@ -228,10 +232,10 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                     images: p.image_urls,
                     hasVideo: !!p.video_url,
                     videoThumbnail: undefined,
-                    upvotes: p.upvotes || 0,
-                    comments: p.comments_count || 0,
-                    isUpvoted: userLikesMap.has(p.id),
-                    userReaction: userLikesMap.get(p.id),
+                    upvotes: likeCount, // Real Count from post_likes
+                    comments: commentCount, // Real Count from post_comments
+                    isUpvoted: myLikedPostIds.has(p.id),
+                    userReaction: myLikedPostIds.has(p.id) ? '👍' : undefined, // simplified for now
                     isBookmarked: userBookmarks.includes(p.id),
                     previewComments: [],
                     postType: p.post_type || (p.community_id ? 'community' : 'personal'),
@@ -443,7 +447,30 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
             }
             setPosts(newPosts);
 
-            // Supabase calls
+            // DB Update (Toggle based on existence)
+            const { data: check } = await supabase
+                .from("post_likes")
+                .select("id")
+                .eq("post_id", id)
+                .eq("user_id", user.id);
+
+            const existing = check && check.length > 0 ? check[0] : null;
+
+            if (existing) {
+                const { error } = await supabase
+                    .from("post_likes")
+                    .delete()
+                    .eq("id", existing.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from("post_likes")
+                    .insert({ post_id: id, user_id: user.id });
+                if (error) throw error;
+            }
+            return; // EXIT EARLY to avoid legacy code
+
+            // Legacy Supabase calls (Optimized for post_likes)
             if (currentReaction === type) {
                 // Delete
                 const { error } = await supabase.from('likes').delete()
