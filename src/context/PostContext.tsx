@@ -46,6 +46,7 @@ export interface FeedPostData {
         type: string;
     }[];
     communityId?: string;
+    postType?: 'personal' | 'community';
 }
 
 interface PostContextType {
@@ -180,8 +181,23 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
             }
             // "trending" usually implies public/all sorted, handled by sort or same as 'all' for now.
             else if (filter === "trending") {
-                query = query.eq('visibility', 'public'); // Improve later with sort
+                query = query.eq('visibility', 'public');
             }
+
+            // Only fetch PERSONAL posts for the main feed/profile context (unless specific later)
+            // Actually, fetchPosts feeds 'usePosts' which is global.
+            // If we filter 'personal' here, community posts won't show in Context.
+            // But Community pages fetch their own posts separately usually?
+            // User Prompt says: "Community posts → Only visible in community feed"
+            // So global feed (Home) should NOT contain community posts.
+            // AND Profile feed (which uses this context) should NOT contain community posts.
+
+            // Therefore, we enforce post_type = 'personal' globally here,
+            // UNLESS we are specifically asking for community posts (which usually happens via a different function, but let's be safe).
+            // Actually, if we filter here, we don't need to filter in Profile.tsx, but Profile.tsx filters 'posts' from context.
+
+            // Let's exclude community posts from this GLOBAL fetch.
+            query = query.is('community_id', null);
 
             const { data: postsData, error } = await query;
 
@@ -244,7 +260,10 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                     comments: p.comments_count || 0,
                     isUpvoted: userLikes.includes(p.id),
                     isBookmarked: userBookmarks.includes(p.id),
+
                     previewComments: [],
+                    postType: p.post_type || (p.community_id ? 'community' : 'personal'),
+                    communityId: p.community_id
                 };
             });
 

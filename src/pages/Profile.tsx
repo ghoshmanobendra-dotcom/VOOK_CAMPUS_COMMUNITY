@@ -462,6 +462,10 @@ const Profile = () => {
       return p.author.id === profile.id && !p.isAnonymous;
     }
     // When viewing others: Show their public posts (Context already masks anonymous ones, so ID will mismatch anyway)
+    // When viewing others: Show their public posts
+    // Filter out community posts (communityId or post_type check)
+    if (p.communityId || p.postType === 'community') return false;
+
     return p.author.id === profile.id;
   });
   const savedPosts = posts.filter(p => p.isBookmarked);
