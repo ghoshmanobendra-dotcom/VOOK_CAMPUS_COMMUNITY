@@ -104,29 +104,35 @@ const Community = () => {
   };
 
   const fetchCommunityGroups = async (communityId: string) => {
+    // Fetch groups linked via community_groups table (Source of Truth after migration)
     const { data, error } = await supabase
-      .from('chats')
+      .from('community_groups')
       .select(`
-        *,
-        participants:chat_participants (
-          user_id
+        group_id,
+        chat:chats (
+          *,
+          participants:chat_participants (
+            user_id
+          )
         )
       `)
       .eq('community_id', communityId)
-      .eq('type', 'group')
-      .eq('is_announcement', false)
-      .order('created_at', { ascending: false });
+      .order('added_at', { ascending: false });
 
     if (!error && data) {
-      const formattedGroups = data.map((group: any) => {
+      const formattedGroups = data.map((item: any) => {
+        const group = item.chat;
+        if (!group) return null; // Should not happen due to FK
         const participants = group.participants || [];
         return {
           ...group,
-          member_count: participants.length, // Useful for display
+          member_count: participants.length,
           is_member: participants.some((p: any) => p.user_id === currentUserId)
         };
-      });
+      }).filter(Boolean); // Remove nulls
       setLinkedGroups(formattedGroups);
+    } else if (error) {
+      console.error("Error fetching community groups:", error);
     }
   };
 
@@ -149,17 +155,32 @@ const Community = () => {
         return;
       }
 
-      // 2. Get details of these chats, ensuring they are NOT already in a community
+      // 2. Get details of these chats
+      // We want chats that are group types
       const { data: chats, error: chatsError } = await supabase
         .from('chats')
         .select('*')
         .in('id', adminChatIds)
-        .eq('type', 'group')
-        .is('community_id', null);
+        .eq('type', 'group');
 
       if (chatsError) throw chatsError;
 
-      setCandidateGroups(chats || []);
+      // 3. Filter out chats that are ALREADY in this community
+      // We need to check community_groups for this community
+      if (chats && chats.length > 0 && selectedCommunity) {
+        const { data: existingLinks } = await supabase
+          .from('community_groups')
+          .select('group_id')
+          .eq('community_id', selectedCommunity.id)
+          .in('group_id', chats.map(c => c.id));
+
+        const existingIds = existingLinks?.map(l => l.group_id) || [];
+        const eligibleGroups = chats.filter(c => !existingIds.includes(c.id));
+        setCandidateGroups(eligibleGroups);
+      } else {
+        setCandidateGroups([]);
+      }
+
     } catch (err) {
       console.error("Error fetching candidate groups:", err);
       toast({ variant: "destructive", title: "Error", description: "Failed to load your groups." });
@@ -169,13 +190,19 @@ const Community = () => {
   };
 
   const handleAddGroupsToCommunity = async () => {
-    if (!selectedCommunity || selectedGroupsToAdd.length === 0) return;
+    if (!selectedCommunity || selectedGroupsToAdd.length === 0 || !currentUserId) return;
 
     try {
+      // Create relationship in community_groups
+      const inserts = selectedGroupsToAdd.map(groupId => ({
+        community_id: selectedCommunity.id,
+        group_id: groupId,
+        added_by: currentUserId
+      }));
+
       const { error } = await supabase
-        .from('chats')
-        .update({ community_id: selectedCommunity.id })
-        .in('id', selectedGroupsToAdd);
+        .from('community_groups')
+        .insert(inserts);
 
       if (error) throw error;
 
@@ -188,11 +215,9 @@ const Community = () => {
 
       if (partError) {
         console.error("Error fetching group participants for sync:", partError);
-        // Don't throw, as the group move succeeded. Just warn/toast.
         toast({ variant: "destructive", title: "Warning", description: "Groups added, but member sync failed." });
       } else if (participants && participants.length > 0) {
         // 2. Prepare batch insert for community_members
-        // Use a Set to avoid duplicates within the batch
         const uniqueUserIds = new Set(participants.map(p => p.user_id));
         const newMembers = Array.from(uniqueUserIds).map(userId => ({
           community_id: selectedCommunity.id,
@@ -207,7 +232,6 @@ const Community = () => {
 
         if (syncError) {
           console.error("Error syncing members:", syncError);
-          toast({ variant: "destructive", title: "Warning", description: "Groups added, but member sync had errors." });
         } else {
           console.log(`Synced ${newMembers.length} members to community.`);
         }
@@ -218,7 +242,6 @@ const Community = () => {
         description: `${selectedGroupsToAdd.length} group(s) added. Members synced.`
       });
 
-      fetchCommunityGroups(selectedCommunity.id);
       fetchCommunityGroups(selectedCommunity.id);
       setIsManageGroupsOpen(false);
       setSelectedGroupsToAdd([]);

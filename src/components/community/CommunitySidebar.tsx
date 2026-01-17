@@ -58,7 +58,7 @@ const CommunitySidebar = ({
                     {/* SECTION 1: GROUPS YOU'RE IN */}
                     <div className="space-y-1">
                         <h3 className="px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                            Groups you're in
+                            JOINED GROUPS
                         </h3>
 
                         {/* Add Group Action (Styled as a list item) */}
