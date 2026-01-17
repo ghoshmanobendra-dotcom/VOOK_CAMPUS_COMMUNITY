@@ -10,58 +10,23 @@ import { supabase } from "@/integrations/supabase/client";
 
 import CommunityPostEditor from "./CommunityPostEditor";
 import CommunityFeed from "./CommunityFeed";
-import CommunityAnnouncementsDialog from "./CommunityAnnouncementsDialog";
+import AnnouncementButton from "./AnnouncementButton";
+import AnnouncementsPanel from "./AnnouncementsPanel";
 
 interface CommunityDetailViewProps {
     community: any;
     groups: any[];
     onOpenGroup: (group: any) => void;
-    onOpenAnnouncement: () => void;
     onInvite: () => void;
 }
 
-const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncement, onInvite }: CommunityDetailViewProps) => {
+const CommunityDetailView = ({ community, groups, onOpenGroup, onInvite }: CommunityDetailViewProps) => {
     const [activeTab, setActiveTab] = useState("posts");
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [editorMode, setEditorMode] = useState<"post" | "announcement">("post");
     const [isAnnouncementsOpen, setIsAnnouncementsOpen] = useState(false);
-    const [hasNewAnnouncements, setHasNewAnnouncements] = useState(false);
 
-    useEffect(() => {
-        if (community?.id) {
-            checkNewAnnouncements();
-        }
-    }, [community?.id]);
-
-    const checkNewAnnouncements = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('posts')
-                .select('created_at')
-                .eq('community_id', community.id)
-                .eq('is_official', true)
-                .order('created_at', { ascending: false })
-                .limit(1);
-
-            if (error) throw error;
-
-            if (data && data.length > 0) {
-                const latestAnnouncementTime = new Date(data[0].created_at).getTime();
-                const lastSeenTimeStr = localStorage.getItem(`last_seen_announcements_${community.id}`);
-                const lastSeenTime = lastSeenTimeStr ? new Date(lastSeenTimeStr).getTime() : 0;
-
-                if (latestAnnouncementTime > lastSeenTime) {
-                    setHasNewAnnouncements(true);
-                } else {
-                    setHasNewAnnouncements(false);
-                }
-            } else {
-                setHasNewAnnouncements(false);
-            }
-        } catch (error) {
-            console.error("Error checking announcements:", error);
-        }
-    };
+    // Old Announcement Logic Removed (handled by button component)
 
     return (
         <div className="flex-1 flex flex-col h-full bg-background/50 overflow-hidden relative">
@@ -95,26 +60,8 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                         Invite
                     </Button>
 
-                    {/* Announcement Button */}
-                    <div className="relative">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-lg relative"
-                            onClick={() => {
-                                setIsAnnouncementsOpen(true);
-                                setHasNewAnnouncements(false);
-                            }}
-                        >
-                            <Megaphone className="h-4 w-4" />
-                        </Button>
-                        {hasNewAnnouncements && (
-                            <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span>
-                            </span>
-                        )}
-                    </div>
+                    {/* Old Announcement Button Removed from Header */}
+
 
                     <Button variant="ghost" size="icon" className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-lg">
                         <Link className="h-4 w-4" />
@@ -272,11 +219,19 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onOpenAnnouncemen
                 </div>
             </ScrollArea>
 
-            <CommunityAnnouncementsDialog
+            {/* Floating Announcement Button */}
+            <div className="fixed bottom-6 right-6 z-40">
+                <AnnouncementButton
+                    communityId={community.id}
+                    onToggle={setIsAnnouncementsOpen}
+                    isOpen={isAnnouncementsOpen}
+                />
+            </div>
+
+            <AnnouncementsPanel
                 communityId={community.id}
-                communityName={community.name}
                 isOpen={isAnnouncementsOpen}
-                onOpenChange={setIsAnnouncementsOpen}
+                onClose={() => setIsAnnouncementsOpen(false)}
             />
         </div>
     );
