@@ -65,7 +65,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
             mounted = false;
             subscription.unsubscribe();
         };
-    }, [location.pathname]);
+    }, []);
 
     if (isAuthenticated === null) {
         return <div className="min-h-screen flex items-center justify-center bg-black">
