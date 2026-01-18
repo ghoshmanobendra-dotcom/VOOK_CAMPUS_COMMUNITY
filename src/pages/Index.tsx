@@ -3,7 +3,7 @@ import Header from "@/components/Header";
 import BottomNav from "@/components/BottomNav";
 import CreatePostBox, { FilterTab } from "@/components/CreatePostBox";
 import SocialFeed from "@/components/SocialFeed";
-import StatusSection from "@/components/StatusSection";
+import { StoryBar } from "@/components/story/StoryBar";
 import { Search, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -184,7 +184,7 @@ const Index = () => {
           )}
         </AnimatePresence>
 
-        <StatusSection />
+        <StoryBar />
         <CreatePostBox activeFilter={activeFilter} onFilterChange={setActiveFilter} />
         <SocialFeed filter={activeFilter} />
       </main>
