@@ -42,38 +42,49 @@ const Alerts = () => {
     // Actually the file had both. I'll stick to sonner 'toast' imported above.
 
     // 1. Fetch Notifications (SAFE)
+    // 1. Fetch Notifications (Manual Join)
     const fetchNotifications = async () => {
         try {
             setIsLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const { data, error } = await supabase
+            // 1. Get raw notifications
+            const { data: notifsData, error: notifsError } = await supabase
                 .from("notifications")
-                .select(`
-                    id,
-                    type,
-                    entity_type,
-                    entity_id,
-                    data,
-                    content,
-                    created_at,
-                    is_read,
-                    actor_id,
-                    actor:profiles(id, username, full_name, avatar_url)
-                `)
+                .select("*")
                 .eq("receiver_id", user.id)
                 .order("created_at", { ascending: false });
 
-            if (error) throw error;
+            if (notifsError) throw notifsError;
 
-            // Safe cast ensuring actor is object if present
-            const safeData = (data || []).map(n => ({
+            // 2. Get unique actor IDs
+            const actorIds = [...new Set((notifsData || []).map(n => n.actor_id).filter(Boolean))];
+
+            // 3. Get profiles
+            let profilesMap: Record<string, any> = {};
+            if (actorIds.length > 0) {
+                const { data: profilesData, error: profilesError } = await supabase
+                    .from("profiles")
+                    .select("id, username, full_name, avatar_url")
+                    .in("id", actorIds);
+
+                if (profilesError) console.error("Error fetching profiles:", profilesError);
+
+                if (profilesData) {
+                    profilesData.forEach(p => {
+                        profilesMap[p.id] = p;
+                    });
+                }
+            }
+
+            // 4. Combine
+            const combined = (notifsData || []).map(n => ({
                 ...n,
-                actor: Array.isArray(n.actor) ? n.actor[0] : n.actor
+                actor: n.actor_id ? profilesMap[n.actor_id] : null
             })) as NotificationData[];
 
-            setNotifications(safeData);
+            setNotifications(combined);
         } catch (err: any) {
             console.error("Error fetching notifications:", err);
             setError("Failed to load notifications.");
@@ -106,24 +117,35 @@ const Alerts = () => {
     }, []);
 
     const fetchNewNotification = async (id: string) => {
-        const { data } = await supabase
+        // Fetch single notification (Manual Join Pattern)
+        const { data: notifData, error } = await supabase
             .from("notifications")
-            .select(`
-                id, type, entity_type, entity_id, data, content, created_at, is_read, actor_id,
-                actor:profiles(id, username, full_name, avatar_url)
-            `)
+            .select("*")
             .eq("id", id)
             .single();
 
-        if (data) {
-            const newItem = {
-                ...data,
-                actor: Array.isArray(data.actor) ? data.actor[0] : data.actor
-            } as NotificationData;
-
-            setNotifications(prev => [newItem, ...prev]);
-            toast.info("New Notification", { description: getNotificationText(newItem) });
+        if (error || !notifData) {
+            console.error("Error fetching new notification", error);
+            return;
         }
+
+        let actor = null;
+        if (notifData.actor_id) {
+            const { data: actorData } = await supabase
+                .from("profiles")
+                .select("id, username, full_name, avatar_url")
+                .eq("id", notifData.actor_id)
+                .single();
+            actor = actorData;
+        }
+
+        const newItem = {
+            ...notifData,
+            actor
+        } as NotificationData;
+
+        setNotifications(prev => [newItem, ...prev]);
+        toast.info("New Notification", { description: getNotificationText(newItem) });
     };
 
     // 3. Routing Logic (Master Prompt)
