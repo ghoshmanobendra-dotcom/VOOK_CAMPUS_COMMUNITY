@@ -10,7 +10,7 @@ import { StoryComposer } from "./StoryComposer";
 import { StoryGroup } from "./types";
 
 export const StoryBar = () => {
-    const { stories, myStories, currentUserId, markAsViewed } = useStorySystem();
+    const { stories, myStories, currentUserId, markAsViewed, deleteStory } = useStorySystem();
     const { currentUser } = usePosts();
     const [viewingGroupIndex, setViewingGroupIndex] = useState<number | null>(null);
     const [isComposerOpen, setIsComposerOpen] = useState(false);
@@ -105,6 +105,7 @@ export const StoryBar = () => {
                     onView={handleViewStory}
                     // Start at first unseen logic?
                     initialIndex={activeGroup.stories.findIndex(s => !s.is_viewed) !== -1 ? activeGroup.stories.findIndex(s => !s.is_viewed) : 0}
+                    deleteStory={deleteStory}
                 />
             )}
 
@@ -116,6 +117,7 @@ export const StoryBar = () => {
                     onClose={() => setViewingMyStories(false)}
                     initialIndex={0}
                     onView={() => { }} // No view tracking for self
+                    deleteStory={deleteStory}
                 />
             )}
 

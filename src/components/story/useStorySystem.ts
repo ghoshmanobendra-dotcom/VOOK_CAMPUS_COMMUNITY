@@ -57,7 +57,16 @@ export const useStorySystem = () => {
                 .select(`
           *,
           profiles:user_id (id, username, full_name, avatar_url),
-          story_views (viewer_id)
+          story_views (
+            viewer_id,
+            created_at,
+            profiles:viewer_id (username, avatar_url)
+          ),
+          story_likes (
+            user_id,
+            created_at,
+            profiles:user_id (username, avatar_url)
+          )
         `)
                 .gt("expires_at", new Date().toISOString())
                 .order("created_at", { ascending: true });
@@ -196,6 +205,19 @@ export const useStorySystem = () => {
         }
     };
 
+    const deleteStory = async (storyId: string) => {
+        if (!currentUserId) return;
+        try {
+            const { error } = await supabase.from('stories').delete().eq('id', storyId).eq('user_id', currentUserId);
+            if (error) throw error;
+            toast.success("Story deleted");
+            fetchStories();
+        } catch (error) {
+            console.error("Delete error", error);
+            toast.error("Failed to delete story");
+        }
+    };
+
     return {
         stories: groupedStories,
         myStories,
@@ -203,6 +225,7 @@ export const useStorySystem = () => {
         currentUserId,
         markAsViewed,
         uploadStory,
+        deleteStory,
         refreshStories: fetchStories
     };
 };

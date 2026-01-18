@@ -15,6 +15,26 @@ export interface Story {
         avatar_url: string;
     };
     is_viewed?: boolean;
+    story_views?: {
+        viewer_id: string;
+        created_at: string;
+        profiles: {
+            username: string;
+            avatar_url: string;
+        }
+    }[];
+    story_likes?: {
+        user_id: string;
+        created_at: string;
+        profiles: {
+            username: string;
+            avatar_url: string;
+        }
+    }[];
+    _count?: {
+        story_views: number;
+        story_likes: number;
+    }
 }
 
 export interface StoryGroup {
