@@ -7,10 +7,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import TiltCard from "@/components/TiltCard";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 import CommunityPostEditor from "./CommunityPostEditor";
 import MicFeedPanel from "./MicFeedPanel";
 import AnnouncementButton from "./AnnouncementButton";
+import CommunitySettingsDialog from "./CommunitySettingsDialog";
+import CommunityInviteDialog from "./CommunityInviteDialog";
+import CommunityMediaTab from "./CommunityMediaTab";
 
 interface CommunityDetailViewProps {
     community: any;
@@ -25,7 +29,9 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onInvite }: Commu
     const [editorMode, setEditorMode] = useState<"post" | "announcement">("post");
     const [isAnnouncementsOpen, setIsAnnouncementsOpen] = useState(false);
 
-    // Old Announcement Logic Removed (handled by button component)
+    // Dialog States
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isInviteOpen, setIsInviteOpen] = useState(false);
 
     return (
         <div className="flex-1 flex flex-col h-full bg-background/50 overflow-hidden relative">
@@ -54,7 +60,12 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onInvite }: Commu
 
                 {/* Header Actions */}
                 <div className="absolute bottom-4 right-6 flex items-center gap-2">
-                    <Button variant="outline" size="sm" className="bg-background/80 backdrop-blur-sm border-transparent shadow-sm hidden md:flex" onClick={onInvite}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-background/80 backdrop-blur-sm border-transparent shadow-sm hidden md:flex"
+                        onClick={() => setIsInviteOpen(true)}
+                    >
                         <UserPlus className="w-4 h-4 mr-2" />
                         Invite
                     </Button>
@@ -66,10 +77,20 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onInvite }: Commu
                         isOpen={isAnnouncementsOpen}
                     />
 
-                    <Button variant="ghost" size="icon" className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-lg">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-lg"
+                        onClick={() => setIsInviteOpen(true)}
+                    >
                         <Link className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-lg">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-lg"
+                        onClick={() => setIsSettingsOpen(true)}
+                    >
                         <Settings className="h-4 w-4" />
                     </Button>
                 </div>
@@ -200,24 +221,33 @@ const CommunityDetailView = ({ community, groups, onOpenGroup, onInvite }: Commu
 
                     {/* FILES TAB */}
                     {activeTab === 'files' && (
-                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                            <FileText className="w-16 h-16 mb-4 opacity-20" />
-                            <h3 className="text-lg font-medium text-foreground">No files yet</h3>
-                            <p className="text-sm">Files shared in groups will appear here.</p>
-                        </div>
+                        <CommunityMediaTab communityId={community.id} type="files" />
                     )}
 
                     {/* PHOTOS TAB */}
                     {activeTab === 'photos' && (
-                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                            <ImageIcon className="w-16 h-16 mb-4 opacity-20" />
-                            <h3 className="text-lg font-medium text-foreground">No photos yet</h3>
-                            <p className="text-sm">Photos shared in groups will appear here.</p>
-                        </div>
+                        <CommunityMediaTab communityId={community.id} type="photos" />
                     )}
 
                 </div>
             </ScrollArea>
+
+            {/* Interactive Dialogs */}
+            <CommunitySettingsDialog
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                community={community}
+                onUpdate={() => {
+                    // Ideally trigger a refresh of community data here
+                    toast.success("Community updated");
+                }}
+            />
+
+            <CommunityInviteDialog
+                isOpen={isInviteOpen}
+                onClose={() => setIsInviteOpen(false)}
+                community={community}
+            />
 
             {/* Mic Feed Panel (Overlay) */}
             <MicFeedPanel
