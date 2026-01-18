@@ -57,16 +57,8 @@ export const useStorySystem = () => {
                 .select(`
           *,
           profiles:user_id (id, username, full_name, avatar_url),
-          story_views (
-            viewer_id,
-            created_at,
-            profiles:viewer_id (username, avatar_url)
-          ),
-          story_likes (
-            user_id,
-            created_at,
-            profiles:user_id (username, avatar_url)
-          )
+          story_views (viewer_id, created_at),
+          story_likes (user_id, created_at)
         `)
                 .gt("expires_at", new Date().toISOString())
                 .order("created_at", { ascending: true });
@@ -164,43 +156,48 @@ export const useStorySystem = () => {
         }
     };
 
-    // Upload Story
-    const uploadStory = async (file: File, caption: string, visibility: string) => {
-        if (!currentUserId) return;
+    // Upload Stories (Multiple)
+    const uploadStories = async (files: File[], caption: string, visibility: string) => {
+        if (!currentUserId || files.length === 0) return;
         try {
-            // Compress if image
-            const processedFile = await compressImage(file);
+            const uploadPromises = files.map(async (file) => {
+                // Compress if image
+                const processedFile = await compressImage(file);
 
-            const fileExt = processedFile.name.split('.').pop();
-            const filePath = `${currentUserId}/${Date.now()}.${fileExt}`;
+                const fileExt = processedFile.name.split('.').pop();
+                const filePath = `${currentUserId}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
 
-            const { error: uploadError } = await supabase.storage
-                .from('images')
-                .upload(filePath, processedFile, { upsert: false });
+                const { error: uploadError } = await supabase.storage
+                    .from('images')
+                    .upload(filePath, processedFile, { upsert: false });
 
-            if (uploadError) throw uploadError;
+                if (uploadError) throw uploadError;
 
-            const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(filePath);
+                const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(filePath);
 
-            const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+                const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-            const { error: insertError } = await supabase.from('stories').insert({
-                user_id: currentUserId,
-                media_url: publicUrl,
-                media_type: file.type.startsWith('video') ? 'video' : 'image',
-                caption,
-                visibility,
-                expires_at: expiresAt
+                // Insert one by one (or could do bulk insert if media_url was array, but schema is 1 row per story?)
+                // Assuming 1 row per story based on schema
+                // "stories" table likely has (id, media_url, ...)
+                return supabase.from('stories').insert({
+                    user_id: currentUserId,
+                    media_url: publicUrl,
+                    media_type: file.type.startsWith('video') ? 'video' : 'image',
+                    caption: files.length === 1 ? caption : '', // Only apply caption to first if single, or all? user didn't specify. empty for bulk might be safer or apply to all.
+                    visibility,
+                    expires_at: expiresAt
+                });
             });
 
-            if (insertError) throw insertError;
+            await Promise.all(uploadPromises);
 
-            toast.success("Story posted!");
+            toast.success("Stories posted!");
             fetchStories(); // Refresh
 
         } catch (error) {
             console.error(error);
-            toast.error("Failed to upload story");
+            toast.error("Failed to upload stories");
             throw error;
         }
     };
@@ -224,7 +221,7 @@ export const useStorySystem = () => {
         isLoading,
         currentUserId,
         markAsViewed,
-        uploadStory,
+        uploadStories,
         deleteStory,
         refreshStories: fetchStories
     };
