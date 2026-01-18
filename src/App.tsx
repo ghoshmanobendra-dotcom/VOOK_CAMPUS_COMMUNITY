@@ -42,12 +42,12 @@ const App = () => (
                 <Profile />
               </ProtectedRoute>
             } />
-            <Route path="/community" element={
+            <Route path="/community/:communityId?" element={
               <ProtectedRoute>
                 <Community />
               </ProtectedRoute>
             } />
-            <Route path="/chats" element={
+            <Route path="/chats/:chatId?" element={
               <ProtectedRoute>
                 <Chats />
               </ProtectedRoute>

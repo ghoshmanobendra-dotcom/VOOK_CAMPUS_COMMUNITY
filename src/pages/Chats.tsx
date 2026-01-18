@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, MoreVertical, Edit2, X, UserPlus, Check, Loader2, BellOff, Trash2, Pin, Mail, Video, Phone, Plus, Image, Smile, Mic, Paperclip, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -70,6 +70,18 @@ const Chats = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
+  const { chatId } = useParams();
+
+  useEffect(() => {
+    if (chatId) {
+      if (chats.length > 0) {
+        const existing = chats.find(c => c.chatId === chatId);
+        if (existing) setActiveChat(existing);
+      }
+    } else {
+      setActiveChat(null);
+    }
+  }, [chatId, chats]);
 
   // Mark badge as cleared when visiting list
   useEffect(() => {
@@ -348,9 +360,7 @@ const Chats = () => {
     if (location.state?.isCommunity) {
       navigate('/community');
     } else {
-      setActiveChat(null);
-      fetchChats();
-      window.history.replaceState({}, document.title);
+      navigate('/chats');
     }
   };
 
@@ -486,7 +496,7 @@ const Chats = () => {
                 "group flex items-center gap-3 p-3 rounded-md cursor-pointer transition-all relative",
                 activeChat?.chatId === chat.chatId ? "bg-muted/80 shadow-sm" : "hover:bg-muted/40"
               )}
-              onClick={() => setActiveChat(chat)}
+              onClick={() => navigate('/chats/' + chat.chatId)}
             >
               <div className="relative shrink-0">
                 <Avatar className="h-10 w-10">

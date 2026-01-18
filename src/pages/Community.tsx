@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import CommunityHero from "@/components/community/CommunityHero";
 import CreateCommunityWizard from "@/components/community/CreateCommunityWizard";
 import CommunitySidebar from "@/components/community/CommunitySidebar";
@@ -37,6 +37,7 @@ interface Community {
 }
 
 const Community = () => {
+  const { communityId } = useParams();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -47,6 +48,17 @@ const Community = () => {
   const [initialTemplateId, setInitialTemplateId] = useState<string | null>(null);
   const [isCreatingComm, setIsCreatingComm] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (communityId) {
+      if (communities.length > 0) {
+        const found = communities.find(c => c.id === communityId);
+        if (found) setSelectedCommunity(found);
+      }
+    } else {
+      setSelectedCommunity(null);
+    }
+  }, [communityId, communities]);
 
   // New State for Community Groups
   const [linkedGroups, setLinkedGroups] = useState<any[]>([]);
@@ -405,7 +417,7 @@ const Community = () => {
                         <TiltCard
                           key={comm.id}
                           intensity={5}
-                          onClick={() => setSelectedCommunity(comm)}
+                          onClick={() => navigate('/community/' + comm.id)}
                           className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border cursor-pointer hover:border-primary/50 transition-all group shadow-sm hover:shadow-md h-full"
                         >
                           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/80 to-violet-600/80 flex items-center justify-center text-white font-bold text-lg shadow-inner shrink-0">
@@ -438,7 +450,7 @@ const Community = () => {
               <CommunitySidebar
                 communityName={selectedCommunity.name}
                 groups={linkedGroups}
-                onBack={() => setSelectedCommunity(null)}
+                onBack={() => navigate('/community')}
                 onSelectGroup={openGroupChat}
                 onAddGroup={() => {
                   setManageGroupTab("discover");
@@ -460,7 +472,7 @@ const Community = () => {
               <div className="flex-1 flex flex-col min-w-0 relative">
                 {/* Mobile Only Back Nav */}
                 <div className="md:hidden p-2 border-b flex items-center gap-2 bg-background">
-                  <Button variant="ghost" size="icon" onClick={() => setSelectedCommunity(null)}>
+                  <Button variant="ghost" size="icon" onClick={() => navigate('/community')}>
                     <ChevronLeft className="h-5 w-5" />
                   </Button>
                   <span className="font-semibold truncate">{selectedCommunity.name}</span>
