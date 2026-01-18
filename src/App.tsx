@@ -12,6 +12,7 @@ import CreatePost from "./pages/CreatePost";
 import Alerts from "./pages/Alerts";
 import Notifications from "./pages/Notifications";
 import Login from "./pages/Login";
+import PostDetails from "./pages/PostDetails";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { PostProvider } from "./context/PostContext";
 import GlobalChatListener from "./components/chat/GlobalChatListener";
@@ -60,6 +61,11 @@ const App = () => (
             <Route path="/notifications" element={
               <ProtectedRoute>
                 <Notifications />
+              </ProtectedRoute>
+            } />
+            <Route path="/post/:postId" element={
+              <ProtectedRoute>
+                <PostDetails />
               </ProtectedRoute>
             } />
             <Route path="/login" element={<Login />} />

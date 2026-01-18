@@ -164,13 +164,9 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
                 .order('created_at', { ascending: false });
 
             if (filter === "campus") {
-                query = query.eq('visibility', 'campus');
+                query = query.eq('community_tag', 'Campus Only');
             } else if (filter === "followers") {
-                query = query.eq('visibility', 'followers');
-            } else if (filter === "all") {
-                query = query.eq('visibility', 'public');
-            } else if (filter === "trending") {
-                query = query.eq('visibility', 'public');
+                query = query.eq('community_tag', 'Followers only');
             }
 
             query = query.is('community_id', null);
@@ -336,7 +332,7 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
             .subscribe();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN') {
+            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
                 await fetchUserProfile();
                 fetchPosts();
                 fetchUnreadCount();

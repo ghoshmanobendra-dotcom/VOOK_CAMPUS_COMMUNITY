@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Drawer, DrawerContent, DrawerTrigger, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter, DrawerClose } from "@/components/ui/drawer";
 import { Settings, Edit2, BookOpen, Users, Award, Folder, Heart, Bookmark, Star, TrendingUp, Music, Film, Gamepad2, Mic, LogOut, Camera, ChevronDown, VolumeX, Ban, UserMinus, UserCheck, Star as StarIcon } from "lucide-react";
 // ... imports
@@ -52,7 +52,15 @@ const Profile = () => {
   const navigate = useNavigate();
   const { state } = useLocation(); // Add hook
   const hasTrustedFollowState = state?.preCheckFollow !== undefined;
-  const [activeTab, setActiveTab] = useState("posts");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "posts";
+  const setActiveTab = (tab: string) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set("tab", tab);
+      return newParams;
+    }, { replace: true });
+  };
   const { userId } = useParams();
 
   // Initialize from navigation state if available
