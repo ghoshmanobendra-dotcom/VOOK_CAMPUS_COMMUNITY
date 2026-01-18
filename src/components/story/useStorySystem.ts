@@ -4,6 +4,37 @@ import { supabase } from "@/integrations/supabase/client";
 import { Story, StoryGroup } from "@/components/story/types";
 import { toast } from "sonner";
 
+// Helper: Compress/Resize Image
+const compressImage = async (file: File): Promise<File> => {
+    if (!file.type.startsWith('image')) return file;
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1200; // Good balance for stories
+            const scale = MAX_WIDTH / img.width;
+            if (scale >= 1) {
+                resolve(file);
+                return;
+            }
+            canvas.width = MAX_WIDTH;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob((blob) => {
+                    if (blob) resolve(new File([blob], file.name, { type: file.type }));
+                    else resolve(file);
+                }, file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.8);
+            } else {
+                resolve(file);
+            }
+        };
+        img.onerror = () => resolve(file);
+    });
+};
+
 export const useStorySystem = () => {
     const [groupedStories, setGroupedStories] = useState<StoryGroup[]>([]);
     const [myStories, setMyStories] = useState<Story[]>([]);
@@ -128,12 +159,15 @@ export const useStorySystem = () => {
     const uploadStory = async (file: File, caption: string, visibility: string) => {
         if (!currentUserId) return;
         try {
-            const fileExt = file.name.split('.').pop();
+            // Compress if image
+            const processedFile = await compressImage(file);
+
+            const fileExt = processedFile.name.split('.').pop();
             const filePath = `${currentUserId}/${Date.now()}.${fileExt}`;
 
             const { error: uploadError } = await supabase.storage
                 .from('images')
-                .upload(filePath, file);
+                .upload(filePath, processedFile, { upsert: false });
 
             if (uploadError) throw uploadError;
 

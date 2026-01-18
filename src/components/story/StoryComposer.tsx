@@ -46,13 +46,17 @@ export const StoryComposer = ({ open, onOpenChange }: StoryComposerProps) => {
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={(val) => {
+            if (!isUploading) onOpenChange(val);
+        }}>
             <DialogContent className="sm:max-w-md bg-black border-zinc-800 p-0 overflow-hidden h-full md:h-auto md:aspect-[9/16] max-h-[80vh] flex flex-col">
                 {/* Header */}
                 <div className="absolute top-4 left-4 z-50">
-                    <button onClick={() => onOpenChange(false)} className="bg-black/40 p-2 rounded-full text-white backdrop-blur">
-                        <X className="h-5 w-5" />
-                    </button>
+                    {!isUploading && (
+                        <button onClick={() => onOpenChange(false)} className="bg-black/40 p-2 rounded-full text-white backdrop-blur">
+                            <X className="h-5 w-5" />
+                        </button>
+                    )}
                 </div>
 
                 {/* Content Area */}
