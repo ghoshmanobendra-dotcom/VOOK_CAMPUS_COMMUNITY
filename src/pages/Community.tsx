@@ -33,6 +33,7 @@ interface Community {
   created_at: string;
   announcement_chat_id?: string;
   member_count?: number;
+  type?: 'public' | 'private';
 }
 
 const Community = () => {

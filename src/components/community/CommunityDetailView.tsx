@@ -21,6 +21,7 @@ interface CommunityDetailViewProps {
     groups: any[];
     onOpenGroup: (group: any) => void;
     onInvite: () => void;
+    onOpenAnnouncement: () => void;
 }
 
 const CommunityDetailView = ({ community, groups, onOpenGroup, onInvite }: CommunityDetailViewProps) => {
