@@ -57,8 +57,8 @@ export const useStorySystem = () => {
                 .select(`
           *,
           profiles:user_id (id, username, full_name, avatar_url),
-          story_views (viewer_id, created_at),
-          story_likes (user_id, created_at)
+          story_views (viewer_id, created_at, profiles:viewer_id (username, avatar_url)),
+          story_likes (user_id, created_at, profiles:user_id (username, avatar_url))
         `)
                 .gt("expires_at", new Date().toISOString())
                 .order("created_at", { ascending: true });
@@ -127,7 +127,10 @@ export const useStorySystem = () => {
 
         const channel = supabase
             .channel("story-updates")
-            .on("postgres_changes", { event: "*", schema: "public", table: "stories" }, () => {
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "stories" }, () => {
+                fetchStories();
+            })
+            .on("postgres_changes", { event: "DELETE", schema: "public", table: "stories" }, () => {
                 fetchStories();
             })
             .subscribe();
