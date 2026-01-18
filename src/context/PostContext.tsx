@@ -263,10 +263,12 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
         const { count } = await supabase
             .from('notifications')
             .select('id', { count: 'exact', head: true })
-            .eq('recipient_id', user.id)
+            .eq('receiver_id', user.id)
             .eq('is_read', false);
         setUnreadCount(count || 0);
     };
+
+    // ... (lines 271-325 unchanged)
 
     const [unreadMessages, setUnreadMessages] = useState(0);
 
@@ -327,7 +329,7 @@ export const PostProvider = ({ children }: { children: ReactNode }) => {
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, async (payload) => {
                 const newNotif = payload.new as any;
                 const { data: { user } } = await supabase.auth.getUser();
-                if (user && newNotif.recipient_id === user.id) {
+                if (user && (newNotif.receiver_id === user.id || newNotif.recipient_id === user.id)) {
                     setUnreadCount(prev => prev + 1);
                 }
             })
